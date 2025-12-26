@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  postgres:
+    container_name: danfezap-postgres
+    image: postgres:15
+    environment:
+      POSTGRES_USER: botdanfe
+      POSTGRES_PASSWORD: senha_segura
+      POSTGRES_DB: danfezap
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - danfezap-network
+
+  app:
+    container_name: danfezap-app
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://botdanfe:senha_segura@postgres:5432/danfezap
+    depends_on:
+      - postgres
+    volumes:
+      - .:/app
+    networks:
+      - danfezap-network
+
+volumes:
+  postgres_data:
+
+networks:
+  danfezap-network:
+    driver: bridge
