@@ -24,6 +24,9 @@ class Config:
     MERCADOPAGO_ACCESS_TOKEN = os.getenv("MERCADOPAGO_ACCESS_TOKEN", "")
     MERCADOPAGO_WEBHOOK_SECRET = os.getenv("MERCADOPAGO_WEBHOOK_SECRET", "")
 
+    # MeuDanfe API
+    MEUDANFE_API_KEY = os.getenv("API_KEY", "")
+
     # Configurações da aplicação
     VALOR_ASSINATURA = float(os.getenv("VALOR_ASSINATURA", "14.90"))
     DIAS_TRIAL = int(os.getenv("DIAS_TRIAL", "7"))

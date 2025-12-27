@@ -1,14 +1,14 @@
 # Bot DANFE WhatsApp
 
-Bot de WhatsApp em Python para motoristas autônomos consultarem DANFE (documento fiscal). O motorista digita a chave de 44 dígitos da nota fiscal e recebe o PDF de volta.
+Bot de WhatsApp em Python para motoristas autônomos consultarem DANFE (documento fiscal). O motorista digita a chave de 44 dígitos da nota fiscal e recebe o PDF do DANFE e o XML da NFe.
 
 ## 🚀 Stack Técnica
 
 - **Linguagem:** Python 3.11+
 - **Framework:** FastAPI
 - **Banco de dados:** PostgreSQL 15
-- **WhatsApp:** Evolution API
-- **Consulta DANFE:** API https://consultadanfe.com
+- **WhatsApp:** Evolution API v2.3.7+
+- **Consulta DANFE:** API MeuDanfe (https://api.meudanfe.com.br/v2)
 - **Pagamento:** Mercado Pago (Pix)
 - **Containerização:** Docker + Docker Compose
 
@@ -24,8 +24,8 @@ danfezap/
 │   ├── models.py            # SQLAlchemy models
 │   ├── services/
 │   │   ├── __init__.py
-│   │   ├── whatsapp.py      # Evolution API (enviar mensagens/PDF)
-│   │   ├── danfe.py         # Consulta API DANFE
+│   │   ├── whatsapp.py      # Evolution API (enviar mensagens/PDF/XML)
+│   │   ├── danfe.py         # Consulta API MeuDanfe (PDF e XML)
 │   │   ├── pagamento.py     # Mercado Pago Pix
 │   │   └── validador.py     # Validação chave NFe
 │   ├── handlers/
@@ -79,13 +79,16 @@ Edite o arquivo `.env` com suas credenciais:
 DATABASE_URL=postgresql://botdanfe:senha_segura@localhost:5432/danfezap
 
 # Evolution API
-EVOLUTION_URL=https://api.carvalhoia.com/manager
+EVOLUTION_URL=https://api.carvalhoia.com
 EVOLUTION_APIKEY=sua_api_key
 EVOLUTION_INSTANCE=danfezap
 
 # Mercado Pago
 MERCADOPAGO_ACCESS_TOKEN=seu_access_token
 MERCADOPAGO_WEBHOOK_SECRET=seu_webhook_secret
+
+# MeuDanfe API
+API_KEY=sua_api_key_meudanfe
 
 # App
 VALOR_ASSINATURA=14.90
@@ -156,9 +159,9 @@ Events: payment
 
 2. **Consulta de DANFE**
    - Usuário envia chave de 44 dígitos
-   - Bot valida estrutura localmente
-   - Consulta DANFE na API
-   - Envia PDF de volta
+   - Bot valida estrutura localmente (Módulo 11)
+   - Consulta DANFE na API MeuDanfe
+   - Envia PDF do DANFE e XML da NFe de volta
 
 3. **Renovação da assinatura**
    - Após 7 dias, assinatura vence

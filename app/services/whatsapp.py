@@ -174,6 +174,80 @@ class WhatsAppService:
                 "erro": f"Erro ao enviar PDF: {str(e)}"
             }
 
+    async def enviar_xml(self, telefone: str, xml_bytes: bytes, filename: str, caption: Optional[str] = None) -> dict:
+        """
+        Envia arquivo XML via Evolution API
+
+        Args:
+            telefone: Número de telefone do destinatário
+            xml_bytes: Bytes do arquivo XML
+            filename: Nome do arquivo (ex: NFE_12345.xml)
+            caption: Legenda opcional para o documento
+
+        Returns:
+            dict: {
+                "sucesso": True/False,
+                "erro": str ou None
+            }
+        """
+        try:
+            # Formatar número
+            numero_formatado = self._formatar_numero(telefone)
+
+            # Converter XML para base64 (mantém bytes puros até aqui)
+            xml_base64 = base64.b64encode(xml_bytes).decode('utf-8')
+            print(f"✓ Enviando XML: {len(xml_bytes)} bytes -> {len(xml_base64)} chars base64")
+
+            # Endpoint de envio de mídia
+            url = f"{self.base_url}/message/sendMedia/{self.instance}"
+
+            # Payload
+            payload = {
+                "number": numero_formatado,
+                "mediatype": "document",
+                "mimetype": "application/xml",
+                "media": xml_base64,
+                "fileName": filename
+            }
+
+            # Adicionar caption se fornecido
+            if caption:
+                payload["caption"] = caption
+
+            # Fazer requisição
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.post(
+                    url,
+                    json=payload,
+                    headers=self._get_headers()
+                )
+
+                if response.status_code == 200 or response.status_code == 201:
+                    print(f"✓ XML enviado com sucesso via Evolution API")
+                    return {
+                        "sucesso": True,
+                        "erro": None
+                    }
+                else:
+                    print(f"✗ Erro ao enviar XML: {response.status_code} - {response.text}")
+                    return {
+                        "sucesso": False,
+                        "erro": f"API retornou status {response.status_code}: {response.text}"
+                    }
+
+        except httpx.TimeoutException:
+            print(f"✗ Timeout ao enviar XML")
+            return {
+                "sucesso": False,
+                "erro": "Timeout ao enviar XML"
+            }
+
+        except Exception as e:
+            return {
+                "sucesso": False,
+                "erro": f"Erro ao enviar XML: {str(e)}"
+            }
+
     async def enviar_imagem(self, telefone: str, imagem_bytes: bytes, caption: Optional[str] = None) -> dict:
         """
         Envia imagem (ex: QR Code do Pix) via Evolution API

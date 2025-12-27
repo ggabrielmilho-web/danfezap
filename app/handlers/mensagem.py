@@ -91,7 +91,7 @@ Se continuar dando erro, manda mensagem pra gente.
     "sucesso": """
 ✅ DANFE encontrado!
 
-Tá aí o PDF 👆
+Tá aí o PDF e o XML 👆
 """,
 
     "processando": """
@@ -318,6 +318,16 @@ class MensagemHandler:
             pdf_bytes,
             filename
         )
+
+        # Enviar XML (se disponível)
+        xml_bytes = resultado_danfe.get("xml_bytes")
+        if xml_bytes:
+            xml_filename = f"NFE_{chave_limpa[-8:]}.xml"
+            await whatsapp_service.enviar_xml(
+                telefone,
+                xml_bytes,
+                xml_filename
+            )
 
         # Enviar mensagem de sucesso
         await whatsapp_service.enviar_mensagem(telefone, MENSAGENS["sucesso"])
