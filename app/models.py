@@ -2,7 +2,7 @@
 Models SQLAlchemy para o banco de dados
 Define as tabelas: usuarios, consultas e pagamentos
 """
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Numeric, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Text, Numeric, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime, timedelta
@@ -20,9 +20,17 @@ class Usuario(Base):
     telefone = Column(String(20), unique=True, nullable=False, index=True)
     nome = Column(String(100))
     data_cadastro = Column(DateTime, default=func.now())
-    data_expiracao = Column(DateTime, nullable=False)
+    data_expiracao = Column(DateTime, nullable=True)
+    data_pagamento = Column(Date, nullable=True)
     ativo = Column(Boolean, default=True)
     mercadopago_id = Column(String(100))
+
+    # Novos campos para sistema de consultas
+    consultas_gratis = Column(Integer, default=5)
+    assinante = Column(Boolean, default=False)
+    consultas_mes = Column(Integer, default=0)
+    limite_consultas = Column(Integer, default=100)
+
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
@@ -36,12 +44,36 @@ class Usuario(Base):
     @property
     def assinatura_ativa(self):
         """Verifica se a assinatura está ativa"""
+        if not self.assinante:
+            return False
+        if not self.data_expiracao:
+            return False
         return self.ativo and self.data_expiracao > datetime.now()
+
+    @property
+    def pode_consultar(self):
+        """Verifica se pode fazer consulta (grátis ou assinante)"""
+        # Não-assinante: verifica consultas grátis
+        if not self.assinante:
+            return self.consultas_gratis > 0
+
+        # Assinante: verifica se não venceu e se não atingiu limite
+        if self.data_expiracao and datetime.now() > self.data_expiracao:
+            return False
+
+        return self.consultas_mes < self.limite_consultas
+
+    @property
+    def consultas_disponiveis(self):
+        """Retorna número de consultas disponíveis"""
+        if not self.assinante:
+            return self.consultas_gratis
+        return self.limite_consultas - self.consultas_mes
 
     @property
     def dias_restantes(self):
         """Calcula quantos dias restam na assinatura"""
-        if self.data_expiracao > datetime.now():
+        if self.data_expiracao and self.data_expiracao > datetime.now():
             delta = self.data_expiracao - datetime.now()
             return delta.days
         return 0

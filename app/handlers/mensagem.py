@@ -18,88 +18,154 @@ MENSAGENS = {
     "boas_vindas": """
 🚛 *Bot DANFE* - Bem-vindo!
 
-Aqui você consulta o DANFE da nota fiscal rapidinho.
+Consulte o DANFE e XML da nota fiscal em segundos.
 
-*Como usar:*
-Manda a chave de 44 números da nota e eu te devolvo o PDF.
+Você tem *5 consultas grátis* pra testar!
 
-Você ganhou *7 dias grátis* pra testar!
-
-Manda a primeira chave aí 👇
+Manda a chave de 44 dígitos 👇
 """,
 
     "instrucoes": """
-📋 *Como usar o Bot DANFE:*
+📋 *Como usar o bot:*
 
-1️⃣ Manda a chave de 44 números da nota fiscal
-2️⃣ Recebe o PDF do DANFE em segundos
+1️⃣ Manda a chave de 44 dígitos da nota
+2️⃣ Recebe o PDF do DANFE e o XML
 
 *Comandos:*
-- Digite *status* pra ver sua assinatura
-- Digite *ajuda* pra ver essa mensagem
+• *status* - Ver suas consultas
+• *ajuda* - Ver essa mensagem
+• *assinar* - Assinar por R$14,90/mês
 
-Dúvidas? Fala com a gente: (XX) XXXXX-XXXX
+💡 Assinantes têm 100 consultas/mês
 """,
 
     "chave_invalida": """
-❌ Chave inválida
+❌ Essa chave não tá válida.
 
-Confere se digitou os 44 números certinho, sem espaços ou letras.
+A chave da NFe tem 44 dígitos.
 
-Exemplo de chave:
-35250112345678000199550010001234561123456789
+Exemplo:
+35210812345678000190550010000123451234567890
+
+Confere e manda de novo!
 """,
 
     "nota_nao_disponivel": """
-⏳ Chave tá certa, mas a nota ainda não apareceu no sistema.
+⚠️ Nota não encontrada ou ainda não tá disponível.
 
-Isso acontece quando a nota acabou de ser emitida.
+Aguarda uns 5-10 minutos e tenta de novo.
+""",
 
-Tenta de novo em 5-10 minutos!
+    "consultas_gratis_acabou": """
+😕 Suas 5 consultas grátis acabaram!
+
+Gostou do serviço? Assina por apenas *R$14,90/mês* e libera *100 consultas*.
+
+Digite *assinar* pra gerar o Pix.
 """,
 
     "assinatura_vencida": """
 ⚠️ Sua assinatura venceu!
 
-Pra continuar usando, renova por apenas *R$ 14,90/mês*
+Renova por *R$14,90* e libera mais *100 consultas*.
 
-Paga o Pix abaixo e já libera na hora 👇
+Digite *assinar* pra gerar o Pix.
 """,
 
-    "pagamento_confirmado": """
-✅ Pagamento confirmado!
+    "limite_atingido": """
+⚠️ Você atingiu o limite de 100 consultas desse período.
 
-Sua assinatura tá ativa por mais 30 dias.
+Suas consultas renovam quando você fizer o próximo pagamento.
 
-Pode mandar a chave da nota aí!
+Digite *assinar* pra renovar agora.
 """,
 
-    "status": """
-📊 *Sua assinatura:*
+    "processando": """
+⏳ Buscando o DANFE...
 
-Status: {status}
-Válida até: {data_expiracao}
-Consultas realizadas: {total_consultas}
+Aguarda só um pouquinho!
 """,
 
     "erro_api": """
-😕 Deu um erro na consulta. Tenta de novo em alguns segundos.
+❌ Deu um problema na consulta.
 
-Se continuar dando erro, manda mensagem pra gente.
+Tenta de novo em alguns minutos.
 """,
 
     "sucesso": """
 ✅ DANFE encontrado!
 
-Tá aí o PDF e o XML 👆
+Enviando PDF e XML...
 """,
 
-    "processando": """
-⏳ Consultando a nota fiscal...
+    "pagamento_confirmado": """
+✅ Pagamento confirmado!
 
-Aguarda uns segundinhos...
+Sua assinatura está ativa por 30 dias.
+Você tem *100 consultas* disponíveis.
+
+Manda a chave da nota aí! 👇
+""",
+
+    "status": """
+📊 *Seu status:*
+
+{status_texto}
+Consultas usadas: {consultas_usadas}/{limite}
+{info_extra}
 """
 }
+
+
+async def verificar_pode_consultar(usuario) -> dict:
+    """
+    Verifica se usuário pode fazer consulta
+
+    Retorna:
+    {"pode": True/False, "motivo": str, "acao": str, "tipo": str}
+    """
+
+    # Caso 1: Não é assinante, usa consultas grátis
+    if not usuario.assinante:
+        if usuario.consultas_gratis > 0:
+            return {"pode": True, "tipo": "gratis"}
+        else:
+            return {
+                "pode": False,
+                "motivo": "consultas_gratis_acabou",
+                "acao": "pedir_assinatura"
+            }
+
+    # Caso 2: É assinante, verifica se venceu
+    if usuario.data_expiracao and datetime.now() > usuario.data_expiracao:
+        return {
+            "pode": False,
+            "motivo": "assinatura_vencida",
+            "acao": "pedir_renovacao"
+        }
+
+    # Caso 3: É assinante ativo, verifica limite mensal
+    if usuario.consultas_mes >= usuario.limite_consultas:
+        return {
+            "pode": False,
+            "motivo": "limite_atingido",
+            "acao": "aguardar_renovacao"
+        }
+
+    return {"pode": True, "tipo": "assinante"}
+
+
+async def registrar_consulta_contador(db, usuario):
+    """
+    Registra a consulta e decrementa o contador correto
+    """
+    if not usuario.assinante:
+        usuario.consultas_gratis -= 1
+    else:
+        usuario.consultas_mes += 1
+
+    db.commit()
+    db.refresh(usuario)
 
 
 class MensagemHandler:
@@ -135,9 +201,32 @@ class MensagemHandler:
             await whatsapp_service.enviar_mensagem(telefone_limpo, MENSAGENS["instrucoes"])
             return
 
-        # 3. Verificar se assinatura está ativa
-        if not usuario.assinatura_ativa:
+        # Comando: assinar
+        if texto_limpo == "assinar":
             await self._solicitar_pagamento(usuario, telefone_limpo)
+            return
+
+        # 3. Verificar se pode consultar
+        verificacao = await verificar_pode_consultar(usuario)
+
+        if not verificacao["pode"]:
+            if verificacao["motivo"] == "consultas_gratis_acabou":
+                await whatsapp_service.enviar_mensagem(
+                    telefone_limpo,
+                    MENSAGENS["consultas_gratis_acabou"]
+                )
+                await self._solicitar_pagamento(usuario, telefone_limpo)
+            elif verificacao["motivo"] == "assinatura_vencida":
+                await whatsapp_service.enviar_mensagem(
+                    telefone_limpo,
+                    MENSAGENS["assinatura_vencida"]
+                )
+                await self._solicitar_pagamento(usuario, telefone_limpo)
+            elif verificacao["motivo"] == "limite_atingido":
+                await whatsapp_service.enviar_mensagem(
+                    telefone_limpo,
+                    MENSAGENS["limite_atingido"]
+                )
             return
 
         # 4. Verificar se é uma chave de NFe (somente números)
@@ -163,13 +252,16 @@ class MensagemHandler:
 
         # Se não existe, criar novo
         if not usuario:
-            # Criar com período trial (7 dias grátis)
-            data_expiracao = datetime.now() + timedelta(days=config.DIAS_TRIAL)
-
+            # Criar com 5 consultas grátis (novo modelo)
             usuario = Usuario(
                 telefone=telefone,
-                data_expiracao=data_expiracao,
-                ativo=True
+                data_cadastro=datetime.now(),
+                consultas_gratis=config.CONSULTAS_GRATIS,  # 5 consultas
+                assinante=False,
+                consultas_mes=0,
+                limite_consultas=config.LIMITE_CONSULTAS_MES,  # 100
+                ativo=True,
+                data_expiracao=None  # Não precisa mais para usuários grátis
             )
 
             self.db.add(usuario)
@@ -185,28 +277,33 @@ class MensagemHandler:
         return usuario
 
     async def _enviar_status(self, usuario: Usuario):
-        """Envia status da assinatura para o usuário"""
-        # Contar consultas
-        total_consultas = self.db.query(Consulta).filter(
-            Consulta.usuario_id == usuario.id,
-            Consulta.sucesso == True
-        ).count()
+        """Envia status da assinatura do usuário"""
 
-        # Status
-        if usuario.assinatura_ativa:
-            status = f"✅ Ativa ({usuario.dias_restantes} dias restantes)"
+        if not usuario.assinante:
+            # Usuário não-assinante (modo grátis)
+            consultas_usadas = 5 - usuario.consultas_gratis
+            mensagem = MENSAGENS["status"].format(
+                status_texto="Conta gratuita",
+                consultas_usadas=consultas_usadas,
+                limite=5,
+                info_extra="Digite *assinar* pra ter 100 consultas/mês"
+            )
         else:
-            status = "❌ Vencida"
+            # Usuário assinante
+            dias_restantes = 0
+            if usuario.data_expiracao:
+                delta = usuario.data_expiracao - datetime.now()
+                dias_restantes = max(0, delta.days)
 
-        # Formatar data
-        data_expiracao_str = usuario.data_expiracao.strftime("%d/%m/%Y às %H:%M")
+            status_texto = "✅ Assinante ativo" if usuario.assinatura_ativa else "❌ Assinatura vencida"
+            info_extra = f"Renova em {dias_restantes} dias" if dias_restantes > 0 else "Digite *assinar* para renovar"
 
-        # Montar mensagem
-        mensagem = MENSAGENS["status"].format(
-            status=status,
-            data_expiracao=data_expiracao_str,
-            total_consultas=total_consultas
-        )
+            mensagem = MENSAGENS["status"].format(
+                status_texto=status_texto,
+                consultas_usadas=usuario.consultas_mes,
+                limite=usuario.limite_consultas,
+                info_extra=info_extra
+            )
 
         await whatsapp_service.enviar_mensagem(usuario.telefone, mensagem)
 
@@ -308,6 +405,9 @@ class MensagemHandler:
         )
         self.db.add(consulta)
         self.db.commit()
+
+        # CRÍTICO: Decrementar contador APENAS em caso de sucesso
+        await registrar_consulta_contador(self.db, usuario)
 
         # Enviar PDF
         pdf_bytes = resultado_danfe["pdf_bytes"]

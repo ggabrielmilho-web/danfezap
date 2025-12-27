@@ -47,10 +47,11 @@ danfezap/
 ### Tabelas
 
 **usuarios**
-- Armazena usuários do bot, assinaturas e período trial
+- Armazena usuários do bot, assinaturas e sistema de consultas
+- Campos principais: `consultas_gratis`, `assinante`, `consultas_mes`, `limite_consultas`
 
 **consultas**
-- Histórico de consultas de DANFE realizadas
+- Histórico de consultas de DANFE realizadas (apenas bem-sucedidas contam no limite)
 
 **pagamentos**
 - Registro de transações do Mercado Pago
@@ -92,8 +93,9 @@ API_KEY=sua_api_key_meudanfe
 
 # App
 VALOR_ASSINATURA=14.90
-DIAS_TRIAL=7
 DIAS_ASSINATURA=30
+CONSULTAS_GRATIS=5
+LIMITE_CONSULTAS_MES=100
 ```
 
 ### 3. Subir os containers
@@ -154,26 +156,47 @@ Events: payment
 
 1. **Primeiro contato**
    - Usuário envia mensagem no WhatsApp
-   - Bot registra e dá 7 dias grátis
+   - Bot registra e dá **5 consultas grátis**
    - Envia mensagem de boas-vindas
 
-2. **Consulta de DANFE**
+2. **Consulta de DANFE (Usuário Gratuito)**
    - Usuário envia chave de 44 dígitos
    - Bot valida estrutura localmente (Módulo 11)
    - Consulta DANFE na API MeuDanfe
    - Envia PDF do DANFE e XML da NFe de volta
+   - **Importante:** Apenas consultas bem-sucedidas consomem o contador (erros não contam!)
+   - Após 5 consultas, precisa assinar
 
-3. **Renovação da assinatura**
-   - Após 7 dias, assinatura vence
+3. **Assinatura Mensal**
+   - Valor: R$ 14,90/mês
+   - Libera **100 consultas por mês**
+   - Contador reseta a cada pagamento
+   - Válida por 30 dias
+
+4. **Renovação da assinatura**
    - Bot gera Pix de R$ 14,90
-   - Usuário paga
-   - Webhook confirma e libera por 30 dias
+   - Usuário paga via Pix
+   - Webhook confirma pagamento
+   - Assinatura ativa por 30 dias + 100 consultas disponíveis
 
 ### Comandos
 
-- **status** - Ver status da assinatura e dias restantes
+- **status** - Ver consultas usadas/disponíveis e dias restantes
 - **ajuda** - Ver instruções de uso
+- **assinar** - Gerar Pix para assinar/renovar
 - **<chave_44_digitos>** - Consultar DANFE
+
+### Sistema de Consultas
+
+**Usuário Gratuito:**
+- 5 consultas grátis
+- Apenas consultas bem-sucedidas contam
+- Erros não descontam do limite
+
+**Assinante:**
+- 100 consultas por mês
+- Contador reseta a cada pagamento (não por mês calendário)
+- Válida por 30 dias
 
 ## 🌐 Endpoints da API
 
@@ -286,5 +309,16 @@ Bot DANFE WhatsApp - Sistema de consulta de notas fiscais
 
 ---
 
-**Versão:** 1.0.0
+**Versão:** 2.0.0
 **Última atualização:** Dezembro 2025
+
+## 📋 Changelog
+
+### v2.0.0 (Dezembro 2025)
+- ✅ Migração de "7 dias grátis" para "5 consultas grátis"
+- ✅ Sistema de limite mensal: 100 consultas para assinantes
+- ✅ Contador reseta a cada pagamento (não por mês calendário)
+- ✅ Apenas consultas bem-sucedidas consomem o contador
+- ✅ Comando "assinar" para gerar Pix
+- ✅ Idempotência no webhook de pagamento
+- ✅ Novos campos no banco: `consultas_gratis`, `assinante`, `consultas_mes`, `limite_consultas`

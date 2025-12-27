@@ -8,9 +8,14 @@ CREATE TABLE IF NOT EXISTS usuarios (
     telefone VARCHAR(20) UNIQUE NOT NULL,
     nome VARCHAR(100),
     data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    data_expiracao TIMESTAMP NOT NULL,
+    data_expiracao TIMESTAMP,
+    data_pagamento DATE,
     ativo BOOLEAN DEFAULT TRUE,
     mercadopago_id VARCHAR(100),
+    consultas_gratis INTEGER DEFAULT 5,
+    assinante BOOLEAN DEFAULT FALSE,
+    consultas_mes INTEGER DEFAULT 0,
+    limite_consultas INTEGER DEFAULT 100,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

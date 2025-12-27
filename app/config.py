@@ -29,8 +29,12 @@ class Config:
 
     # Configurações da aplicação
     VALOR_ASSINATURA = float(os.getenv("VALOR_ASSINATURA", "14.90"))
-    DIAS_TRIAL = int(os.getenv("DIAS_TRIAL", "7"))
+    DIAS_TRIAL = int(os.getenv("DIAS_TRIAL", "7"))  # Mantido para compatibilidade
     DIAS_ASSINATURA = int(os.getenv("DIAS_ASSINATURA", "30"))
+
+    # Novas configurações - sistema de consultas
+    CONSULTAS_GRATIS = int(os.getenv("CONSULTAS_GRATIS", "5"))
+    LIMITE_CONSULTAS_MES = int(os.getenv("LIMITE_CONSULTAS_MES", "100"))
 
     @classmethod
     def validar_config(cls):

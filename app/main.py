@@ -190,6 +190,14 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
             logger.warning(f"Pagamento não encontrado no banco: {id_transacao}")
             return JSONResponse({"status": "not_found"})
 
+        # IDEMPOTÊNCIA: Verificar se pagamento já foi processado
+        if pagamento.status == "aprovado":
+            logger.info(f"Pagamento já processado anteriormente: {id_transacao}")
+            return JSONResponse({
+                "status": "already_processed",
+                "message": "Pagamento já foi aprovado anteriormente"
+            })
+
         # Atualizar status do pagamento
         pagamento.status = "aprovado"
         pagamento.data_pagamento = dados_pagamento.get("data_pagamento") or datetime.now()
@@ -202,14 +210,15 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
             db.commit()
             return JSONResponse({"status": "user_not_found"})
 
-        # Atualizar assinatura do usuário (adicionar 30 dias a partir de agora ou da data de expiração)
-        if usuario.data_expiracao > datetime.now():
-            # Se ainda tem tempo, adiciona a partir da data de expiração
-            usuario.data_expiracao = usuario.data_expiracao + timedelta(days=config.DIAS_ASSINATURA)
-        else:
-            # Se já venceu, adiciona a partir de agora
-            usuario.data_expiracao = datetime.now() + timedelta(days=config.DIAS_ASSINATURA)
+        # Renovar/ativar assinatura
+        usuario.assinante = True
+        usuario.consultas_mes = 0  # RESETA O CONTADOR (libera 100 consultas)
+        usuario.consultas_gratis = 0  # Zera consultas grátis (não precisa mais)
+        usuario.data_pagamento = datetime.now().date()
+        usuario.limite_consultas = config.LIMITE_CONSULTAS_MES  # 100
 
+        # SEMPRE adiciona 30 dias a partir de AGORA (cancela trial se existir)
+        usuario.data_expiracao = datetime.now() + timedelta(days=config.DIAS_ASSINATURA)
         usuario.ativo = True
 
         # Salvar no banco
