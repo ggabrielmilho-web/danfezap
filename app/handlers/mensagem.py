@@ -16,7 +16,7 @@ import base64
 # Mensagens do bot
 MENSAGENS = {
     "boas_vindas": """
-🚛 *Bot DANFE* - Bem-vindo!
+🚛 *DanfeZap* - Bem-vindo!
 
 Consulte o DANFE e XML da nota fiscal em segundos.
 
@@ -37,6 +37,17 @@ Manda a chave de 44 dígitos 👇
 • *assinar* - Assinar por R$14,90/mês
 
 💡 Assinantes têm 100 consultas/mês
+""",
+
+    "ajuda": """
+📞 *Precisa de ajuda?*
+
+Fique tranquilo! A equipe *DanfeZap* está pronta para te atender.
+
+Entre em contato com nosso suporte:
+*(34) 99943-4613*
+
+Estamos aqui para ajudar! 🚛
 """,
 
     "chave_invalida": """
@@ -198,7 +209,7 @@ class MensagemHandler:
 
         # Comando: ajuda
         if texto_limpo in ["ajuda", "help", "menu"]:
-            await whatsapp_service.enviar_mensagem(telefone_limpo, MENSAGENS["instrucoes"])
+            await whatsapp_service.enviar_mensagem(telefone_limpo, MENSAGENS["ajuda"])
             return
 
         # Comando: assinar

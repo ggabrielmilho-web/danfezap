@@ -46,7 +46,7 @@ class PagamentoService:
             # Criar payload para pagamento
             payment_data = {
                 "transaction_amount": float(valor),
-                "description": f"Assinatura Bot DANFE - 30 dias",
+                "description": f"Assinatura DanfeZap - 30 dias",
                 "payment_method_id": "pix",
                 "payer": {
                     "email": f"user{usuario_id}@danfezap.com",  # Email fictício
