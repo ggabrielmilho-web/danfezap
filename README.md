@@ -137,7 +137,7 @@ Resposta esperada:
 Configure o webhook no painel da Evolution API:
 
 ```
-URL: http://seu-servidor.com:8000/webhook/evolution
+URL: https://danfezap.carvalhoia.com/webhook/evolution
 Events: messages.upsert
 ```
 
@@ -146,9 +146,11 @@ Events: messages.upsert
 Configure o webhook no painel do Mercado Pago:
 
 ```
-URL: http://seu-servidor.com:8000/webhook/mercadopago
+URL: https://danfezap.carvalhoia.com/webhook/mercadopago
 Events: payment
 ```
+
+**Importante:** A variável `WEBHOOK_BASE_URL` no arquivo `.env` deve apontar para o domínio onde sua aplicação está rodando (ex: https://danfezap.carvalhoia.com). Esta URL é usada automaticamente pelo sistema para configurar os webhooks do Mercado Pago.
 
 ## 📱 Como Funciona
 

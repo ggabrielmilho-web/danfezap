@@ -59,7 +59,7 @@ class PagamentoService:
                 },
                 "external_reference": f"usuario_{usuario_id}",  # Referência para identificar o usuário
                 "date_of_expiration": expiracao.isoformat(),
-                "notification_url": f"{config.EVOLUTION_URL.replace('/manager', '')}/webhook/mercadopago"  # Webhook
+                "notification_url": f"{config.WEBHOOK_BASE_URL}/webhook/mercadopago"  # Webhook
             }
 
             # Criar pagamento

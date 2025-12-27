@@ -20,6 +20,9 @@ class Config:
     EVOLUTION_APIKEY = os.getenv("EVOLUTION_APIKEY", "")
     EVOLUTION_INSTANCE = os.getenv("EVOLUTION_INSTANCE", "")
 
+    # URL base para webhooks (onde nossa aplicação recebe callbacks)
+    WEBHOOK_BASE_URL = os.getenv("WEBHOOK_BASE_URL", "http://localhost:8000")
+
     # Mercado Pago
     MERCADOPAGO_ACCESS_TOKEN = os.getenv("MERCADOPAGO_ACCESS_TOKEN", "")
     MERCADOPAGO_WEBHOOK_SECRET = os.getenv("MERCADOPAGO_WEBHOOK_SECRET", "")
