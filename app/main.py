@@ -108,12 +108,19 @@ async def webhook_evolution(request: Request, db: Session = Depends(get_db)):
 
         # Extrair número do remetente
         remote_jid = key.get("remoteJid", "")
-        if not remote_jid:
+        remote_jid_alt = key.get("remoteJidAlt", "")
+
+        if not remote_jid and not remote_jid_alt:
             logger.warning("Webhook sem remoteJid")
             return JSONResponse({"status": "error", "message": "remoteJid not found"})
 
-        # Extrair telefone (remover @s.whatsapp.net)
-        telefone = remote_jid.replace("@s.whatsapp.net", "")
+        # Se for LID (@lid), usar o remoteJidAlt que tem o número real
+        if "@lid" in remote_jid and remote_jid_alt:
+            logger.info(f"LID detectado: {remote_jid} -> usando alt: {remote_jid_alt}")
+            remote_jid = remote_jid_alt
+
+        # Extrair telefone (remover @s.whatsapp.net ou @lid)
+        telefone = remote_jid.replace("@s.whatsapp.net", "").replace("@lid", "")
 
         # Extrair texto da mensagem
         texto = None
