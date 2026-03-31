@@ -30,6 +30,12 @@ class Config:
     # MeuDanfe API
     MEUDANFE_API_KEY = os.getenv("API_KEY", "")
 
+    # Google Vision API
+    GOOGLE_VISION_API_KEY = os.getenv("GOOGLE_VISION_API_KEY", "")
+
+    # Resend API (envio de emails)
+    RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+
     # Configurações da aplicação
     VALOR_ASSINATURA = float(os.getenv("VALOR_ASSINATURA", "14.90"))
     DIAS_TRIAL = int(os.getenv("DIAS_TRIAL", "7"))  # Mantido para compatibilidade

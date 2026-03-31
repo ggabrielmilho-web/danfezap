@@ -31,6 +31,14 @@ class Usuario(Base):
     consultas_mes = Column(Integer, default=0)
     limite_consultas = Column(Integer, default=100)
 
+    # Emails para envio automático de DANFE
+    email = Column(String(255), nullable=True)
+    email_secundario = Column(String(255), nullable=True)
+
+    # Estado de conversa para cadastro de email
+    aguardando_email_principal = Column(Boolean, default=False)
+    aguardando_email_secundario = Column(Boolean, default=False)
+
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 

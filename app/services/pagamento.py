@@ -3,9 +3,14 @@ Serviço de integração com Mercado Pago
 Gera cobranças Pix e verifica status de pagamento
 """
 import mercadopago
+import logging
 from typing import Optional
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from ..config import config
+
+# Configurar logger
+logger = logging.getLogger(__name__)
 
 
 class PagamentoService:
@@ -40,9 +45,6 @@ class PagamentoService:
             if valor is None:
                 valor = config.VALOR_ASSINATURA
 
-            # Calcular data de expiração (30 minutos)
-            expiracao = datetime.now() + timedelta(minutes=30)
-
             # Criar payload para pagamento
             payment_data = {
                 "transaction_amount": float(valor),
@@ -58,22 +60,37 @@ class PagamentoService:
                     }
                 },
                 "external_reference": f"usuario_{usuario_id}",  # Referência para identificar o usuário
-                "date_of_expiration": expiracao.isoformat(),
                 "notification_url": f"{config.WEBHOOK_BASE_URL}/webhook/mercadopago"  # Webhook
             }
+
+            # Log do payload (sem dados sensíveis)
+            logger.info(f"Criando pagamento Pix - Usuario: {usuario_id}, Valor: R${valor}")
+            logger.debug(f"Payload completo: {payment_data}")
 
             # Criar pagamento
             payment_response = self.sdk.payment().create(payment_data)
             payment = payment_response["response"]
 
+            # Log da resposta do Mercado Pago
+            logger.info(f"Resposta Mercado Pago - Status: {payment_response['status']}")
+            logger.debug(f"Resposta completa: {payment_response}")
+
             # Verificar se foi criado com sucesso
             if payment_response["status"] not in [200, 201]:
+                erro_msg = payment_response.get('message', 'Erro desconhecido')
+                logger.error(
+                    f"Falha ao criar pagamento Pix - "
+                    f"Usuario: {usuario_id}, "
+                    f"Status HTTP: {payment_response['status']}, "
+                    f"Erro: {erro_msg}, "
+                    f"Resposta completa: {payment_response}"
+                )
                 return {
                     "sucesso": False,
                     "qr_code": None,
                     "qr_code_base64": None,
                     "id_transacao": None,
-                    "erro": f"Erro ao criar pagamento: {payment_response.get('message', 'Erro desconhecido')}"
+                    "erro": f"Erro ao criar pagamento (HTTP {payment_response['status']}): {erro_msg}"
                 }
 
             # Extrair dados do Pix
@@ -84,13 +101,30 @@ class PagamentoService:
             id_transacao = str(payment.get("id"))
 
             if not qr_code or not qr_code_base64:
+                logger.error(
+                    f"Mercado Pago não retornou dados do Pix - "
+                    f"Usuario: {usuario_id}, "
+                    f"ID Transacao: {id_transacao}, "
+                    f"QR Code presente: {bool(qr_code)}, "
+                    f"QR Code Base64 presente: {bool(qr_code_base64)}, "
+                    f"Dados PIX: {pix_data}, "
+                    f"Resposta completa: {payment}"
+                )
                 return {
                     "sucesso": False,
                     "qr_code": None,
                     "qr_code_base64": None,
                     "id_transacao": id_transacao,
-                    "erro": "Mercado Pago não retornou dados do Pix"
+                    "erro": f"Mercado Pago não retornou dados do Pix (ID: {id_transacao})"
                 }
+
+            # Log de sucesso
+            logger.info(
+                f"Pix gerado com sucesso - "
+                f"Usuario: {usuario_id}, "
+                f"ID Transacao: {id_transacao}, "
+                f"Valor: R${valor}"
+            )
 
             return {
                 "sucesso": True,
@@ -101,12 +135,18 @@ class PagamentoService:
             }
 
         except Exception as e:
+            logger.exception(
+                f"Exceção ao gerar Pix - "
+                f"Usuario: {usuario_id}, "
+                f"Valor: R${valor}, "
+                f"Erro: {str(e)}"
+            )
             return {
                 "sucesso": False,
                 "qr_code": None,
                 "qr_code_base64": None,
                 "id_transacao": None,
-                "erro": f"Erro ao gerar Pix: {str(e)}"
+                "erro": f"Erro ao gerar Pix: {type(e).__name__}: {str(e)}"
             }
 
     def verificar_pagamento(self, id_transacao: str) -> dict:

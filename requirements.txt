@@ -7,3 +7,11 @@ httpx==0.26.0
 mercadopago==2.2.1
 pydantic==2.5.3
 python-multipart==0.0.6
+
+# Processamento de imagem para extrair chave NFe
+pyzbar==0.1.9
+opencv-python-headless==4.8.1.78
+Pillow==10.1.0
+
+# Envio de emails
+resend==2.0.0

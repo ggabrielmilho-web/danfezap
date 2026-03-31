@@ -18,11 +18,24 @@ MENSAGENS = {
     "boas_vindas": """
 🚛 *DanfeZap* - Bem-vindo!
 
-Consulte o DANFE e XML da nota fiscal em segundos.
+Consulte DANFE e XML em segundos.
 
-Você tem *5 consultas grátis* pra testar!
+📸 *Como usar:*
+• Tira foto do código de barras da nota
+• Ou digita a chave de 44 dígitos
 
-Manda a chave de 44 dígitos 👇
+📧 Receba também por email (Pode Cadastrar até DOIS email)!
+
+⚠️ Foto da nota inteira não funciona, foca só no código de barras!
+
+✅ Você tem *5 consultas grátis* pra testar!
+
+*Comandos:*
+• *status* - Ver suas consultas
+• *email* - Cadastrar/ver emails
+• *assinar* - R$14,90/mês (100 consultas)
+
+Manda a foto ou a chave pra começar 👇
 """,
 
     "instrucoes": """
@@ -72,7 +85,7 @@ Aguarda uns 5-10 minutos e tenta de novo.
 
 Gostou do serviço? Assina por apenas *R$14,90/mês* e libera *100 consultas*.
 
-Digite *assinar* pra gerar o Pix.
+Gerando seu Pix... 👇
 """,
 
     "assinatura_vencida": """
@@ -80,7 +93,7 @@ Digite *assinar* pra gerar o Pix.
 
 Renova por *R$14,90* e libera mais *100 consultas*.
 
-Digite *assinar* pra gerar o Pix.
+Gerando seu Pix... 👇
 """,
 
     "limite_atingido": """
@@ -124,6 +137,68 @@ Manda a chave da nota aí! 👇
 {status_texto}
 Consultas usadas: {consultas_usadas}/{limite}
 {info_extra}
+""",
+
+    "perguntar_email_principal": """
+📧 Quer receber por email também?
+
+Manda seu email ou "não" pra pular.
+""",
+
+    "perguntar_email_secundario": """
+📧 Quer cadastrar um segundo email? (contador, transportadora, etc.)
+
+Manda o email ou "não" pra pular.
+""",
+
+    "email_cadastrado": """
+✅ Email cadastrado: {email}
+""",
+
+    "emails_cadastrados_completo": """
+✅ Emails cadastrados!
+
+Principal: {email1}
+Secundário: {email2}
+
+Enviando DANFE pros seus emails... 📤
+""",
+
+    "email_enviado_automatico": """
+✅ DANFE enviado!
+
+📧 Também enviei pro(s) seu(s) email(s) cadastrado(s).
+""",
+
+    "email_invalido": """
+❌ Email inválido.
+
+Manda um email válido (ex: seuemail@gmail.com) ou "não" pra pular.
+""",
+
+    "erro_envio_email": """
+⚠️ Erro ao enviar email. Mas o DANFE foi enviado aqui no WhatsApp!
+""",
+
+    "ver_emails": """
+📧 *Emails cadastrados:*
+
+Principal: {email1}
+Secundário: {email2}
+
+Quer alterar? Manda o novo email ou "limpar" pra apagar.
+""",
+
+    "nao_entendi": """
+Não entendi 😅
+
+📸 Manda a foto do código de barras
+Ou digita a chave de 44 dígitos
+
+*Comandos:*
+• *status* - Ver suas consultas
+• *email* - Cadastrar/ver emails
+• *assinar* - R$14,90/mês
 """
 }
 
@@ -197,9 +272,15 @@ class MensagemHandler:
         telefone_limpo = ''.join(filter(str.isdigit, telefone))
 
         # 1. Buscar ou criar usuário
-        usuario = self._buscar_ou_criar_usuario(telefone_limpo)
+        usuario, usuario_novo = self._buscar_ou_criar_usuario(telefone_limpo)
 
-        # 2. Processar comando/texto
+        # 2. NOVO: Verificar se está aguardando resposta de email
+        if usuario.aguardando_email_principal or usuario.aguardando_email_secundario:
+            processou = await self._processar_resposta_email(usuario, telefone_limpo, texto)
+            if processou:
+                return  # Email processado, para por aqui
+
+        # 3. Processar comando/texto
         texto_limpo = texto.strip().lower()
 
         # Comando: status
@@ -214,10 +295,16 @@ class MensagemHandler:
 
         # Comando: assinar
         if texto_limpo == "assinar":
+            await whatsapp_service.enviar_mensagem(telefone_limpo, "💳 Gerando seu Pix... 👇")
             await self._solicitar_pagamento(usuario, telefone_limpo)
             return
 
-        # 3. Verificar se pode consultar
+        # Comando: email
+        if texto_limpo in ["email", "e-mail"]:
+            await self._gerenciar_emails(usuario, telefone_limpo)
+            return
+
+        # 4. Verificar se pode consultar
         verificacao = await verificar_pode_consultar(usuario)
 
         if not verificacao["pode"]:
@@ -240,15 +327,17 @@ class MensagemHandler:
                 )
             return
 
-        # 4. Verificar se é uma chave de NFe (somente números)
+        # 5. Verificar se é uma chave de NFe (somente números)
         if texto_limpo.replace(" ", "").isdigit():
             await self._processar_chave_nfe(usuario, telefone_limpo, texto_limpo)
             return
 
-        # 5. Mensagem não reconhecida - enviar instruções
-        await whatsapp_service.enviar_mensagem(telefone_limpo, MENSAGENS["instrucoes"])
+        # 6. Mensagem não reconhecida - enviar resposta padrão
+        # Não enviar se for usuário novo (já recebeu boas-vindas)
+        if not usuario_novo:
+            await whatsapp_service.enviar_mensagem(telefone_limpo, MENSAGENS["nao_entendi"])
 
-    def _buscar_ou_criar_usuario(self, telefone: str) -> Usuario:
+    def _buscar_ou_criar_usuario(self, telefone: str) -> tuple[Usuario, bool]:
         """
         Busca usuário existente ou cria novo com período trial
 
@@ -256,7 +345,7 @@ class MensagemHandler:
             telefone: Número de telefone
 
         Returns:
-            Usuario: Objeto do usuário
+            tuple[Usuario, bool]: (Objeto do usuário, True se novo usuário criado)
         """
         # Buscar usuário existente
         usuario = self.db.query(Usuario).filter(Usuario.telefone == telefone).first()
@@ -285,7 +374,9 @@ class MensagemHandler:
                 whatsapp_service.enviar_mensagem(telefone, MENSAGENS["boas_vindas"])
             )
 
-        return usuario
+            return usuario, True  # Usuário novo criado
+
+        return usuario, False  # Usuário existente
 
     async def _enviar_status(self, usuario: Usuario):
         """Envia status da assinatura do usuário"""
@@ -343,17 +434,21 @@ class MensagemHandler:
         self.db.add(pagamento)
         self.db.commit()
 
-        # Enviar mensagem de assinatura vencida
-        await whatsapp_service.enviar_mensagem(telefone, MENSAGENS["assinatura_vencida"])
-
         # Enviar QR Code do Pix
         qr_code_base64 = resultado_pix["qr_code_base64"]
         qr_code_bytes = base64.b64decode(qr_code_base64)
 
+        # Mensagem 1: QR Code com informações
         await whatsapp_service.enviar_imagem(
             telefone,
             qr_code_bytes,
-            f"*Pix copia e cola:*\n\n`{resultado_pix['qr_code']}`"
+            f"💳 *Pagamento via Pix*\n\nEscaneie o QR Code ou copie o código abaixo:"
+        )
+
+        # Mensagem 2: Código Pix puro (sem formatação para facilitar cópia)
+        await whatsapp_service.enviar_mensagem(
+            telefone,
+            resultado_pix['qr_code']
         )
 
     async def _processar_chave_nfe(self, usuario: Usuario, telefone: str, chave: str):
@@ -442,6 +537,181 @@ class MensagemHandler:
 
         # Enviar mensagem de sucesso
         await whatsapp_service.enviar_mensagem(telefone, MENSAGENS["sucesso"])
+
+        # NOVO: Enviar por email se cadastrado
+        emails_para_enviar = []
+        if usuario.email:
+            emails_para_enviar.append(usuario.email)
+        if usuario.email_secundario:
+            emails_para_enviar.append(usuario.email_secundario)
+
+        if emails_para_enviar:
+            # Já tem email cadastrado → enviar automaticamente
+            from app.services.email_service import email_service
+
+            resultado_email = await email_service.enviar_danfe(
+                emails=emails_para_enviar,
+                chave_nfe=chave_limpa,
+                pdf_bytes=pdf_bytes,
+                xml_bytes=xml_bytes
+            )
+
+            if resultado_email["sucesso"]:
+                await whatsapp_service.enviar_mensagem(
+                    telefone,
+                    MENSAGENS["email_enviado_automatico"]
+                )
+            else:
+                await whatsapp_service.enviar_mensagem(
+                    telefone,
+                    MENSAGENS["erro_envio_email"]
+                )
+        else:
+            # Não tem email → perguntar se quer cadastrar
+            usuario.aguardando_email_principal = True
+            self.db.commit()
+
+            await whatsapp_service.enviar_mensagem(
+                telefone,
+                MENSAGENS["perguntar_email_principal"]
+            )
+
+    def _validar_email(self, texto: str) -> bool:
+        """
+        Valida formato básico de email
+
+        Args:
+            texto: Texto a ser validado
+
+        Returns:
+            bool: True se formato válido, False caso contrário
+        """
+        import re
+        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        return bool(re.match(pattern, texto.strip()))
+
+    async def _processar_resposta_email(self, usuario: Usuario, telefone: str, texto: str) -> bool:
+        """
+        Processa resposta quando usuário está aguardando cadastro de email
+
+        Args:
+            usuario: Objeto do usuário
+            telefone: Número de telefone
+            texto: Texto enviado pelo usuário
+
+        Returns:
+            bool: True se processou email, False se deve continuar fluxo normal
+        """
+        texto_limpo = texto.strip().lower()
+
+        # Aguardando email principal
+        if usuario.aguardando_email_principal:
+            # Se disser não, cancela
+            if texto_limpo in ["não", "nao", "n"]:
+                usuario.aguardando_email_principal = False
+                self.db.commit()
+                await whatsapp_service.enviar_mensagem(
+                    telefone,
+                    "👍 Beleza! Qualquer coisa é só mandar outra chave."
+                )
+                return True
+
+            # Se for email válido, salva
+            if self._validar_email(texto):
+                usuario.email = texto.strip()
+                usuario.aguardando_email_principal = False
+                usuario.aguardando_email_secundario = True  # Perguntar segundo
+                self.db.commit()
+
+                await whatsapp_service.enviar_mensagem(
+                    telefone,
+                    MENSAGENS["email_cadastrado"].format(email=usuario.email)
+                )
+                await whatsapp_service.enviar_mensagem(
+                    telefone,
+                    MENSAGENS["perguntar_email_secundario"]
+                )
+                return True
+
+            # Email inválido mas não é comando/chave → avisar
+            if not texto_limpo.replace(" ", "").isdigit() and texto_limpo not in ["status", "ajuda", "assinar", "email"]:
+                await whatsapp_service.enviar_mensagem(
+                    telefone,
+                    MENSAGENS["email_invalido"]
+                )
+                return True
+
+            # É comando ou chave → resetar estado e continuar fluxo normal
+            usuario.aguardando_email_principal = False
+            self.db.commit()
+            return False
+
+        # Aguardando email secundário
+        if usuario.aguardando_email_secundario:
+            # Se disser não, finaliza cadastro
+            if texto_limpo in ["não", "nao", "n"]:
+                usuario.aguardando_email_secundario = False
+                self.db.commit()
+                await whatsapp_service.enviar_mensagem(
+                    telefone,
+                    f"✅ Email cadastrado!\n\nPrincipal: {usuario.email}"
+                )
+                return True
+
+            # Se for email válido, salva
+            if self._validar_email(texto):
+                usuario.email_secundario = texto.strip()
+                usuario.aguardando_email_secundario = False
+                self.db.commit()
+
+                await whatsapp_service.enviar_mensagem(
+                    telefone,
+                    MENSAGENS["emails_cadastrados_completo"].format(
+                        email1=usuario.email,
+                        email2=usuario.email_secundario
+                    )
+                )
+                return True
+
+            # Email inválido mas não é comando/chave → avisar
+            if not texto_limpo.replace(" ", "").isdigit() and texto_limpo not in ["status", "ajuda", "assinar", "email"]:
+                await whatsapp_service.enviar_mensagem(
+                    telefone,
+                    MENSAGENS["email_invalido"]
+                )
+                return True
+
+            # É comando ou chave → resetar estado e continuar fluxo normal
+            usuario.aguardando_email_secundario = False
+            self.db.commit()
+            return False
+
+        return False
+
+    async def _gerenciar_emails(self, usuario: Usuario, telefone: str):
+        """
+        Mostra e permite gerenciar emails cadastrados
+
+        Args:
+            usuario: Objeto do usuário
+            telefone: Número de telefone
+        """
+        if not usuario.email and not usuario.email_secundario:
+            await whatsapp_service.enviar_mensagem(
+                telefone,
+                "📧 Você ainda não cadastrou nenhum email.\n\nFaça uma consulta e vou te perguntar se quer receber por email!"
+            )
+            return
+
+        email1 = usuario.email or "Não cadastrado"
+        email2 = usuario.email_secundario or "Não cadastrado"
+
+        await whatsapp_service.enviar_mensagem(
+            telefone,
+            MENSAGENS["ver_emails"].format(email1=email1, email2=email2)
+        )
+
+        # TODO: implementar lógica de alteração/limpeza (fase 2)
 
 
 async def processar_mensagem_recebida(telefone: str, texto: str, db: Session):

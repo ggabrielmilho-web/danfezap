@@ -12,6 +12,7 @@ from .database import get_db, init_db
 from .models import Usuario, Pagamento
 from .handlers.mensagem import processar_mensagem_recebida
 from .services.pagamento import pagamento_service
+from .services.image_reader import image_reader_service
 from .config import config
 
 # Configurar logging
@@ -124,14 +125,21 @@ async def webhook_evolution(request: Request, db: Session = Depends(get_db)):
 
         # Extrair texto da mensagem
         texto = None
+        message_type = data.get("messageType", "")
 
-        # Tentar diferentes formatos de mensagem
+        # Verificar se é imagem
+        if message_type == "imageMessage" or "imageMessage" in message:
+            logger.info(f"Imagem recebida de {telefone}")
+
+            # Processar imagem (extrair chave automaticamente)
+            await processar_imagem_recebida(telefone, data, db)
+            return JSONResponse({"status": "success", "message": "image_processed"})
+
+        # Tentar diferentes formatos de mensagem de texto
         if "conversation" in message:
             texto = message["conversation"]
         elif "extendedTextMessage" in message:
             texto = message["extendedTextMessage"].get("text", "")
-        elif "imageMessage" in message:
-            texto = message["imageMessage"].get("caption", "")
 
         if not texto:
             logger.info("Mensagem sem texto (pode ser mídia)")
@@ -139,7 +147,7 @@ async def webhook_evolution(request: Request, db: Session = Depends(get_db)):
 
         logger.info(f"Processando mensagem de {telefone}: {texto}")
 
-        # Processar mensagem
+        # Processar mensagem de texto
         await processar_mensagem_recebida(telefone, texto, db)
 
         return JSONResponse({"status": "success", "message": "processed"})
@@ -149,6 +157,59 @@ async def webhook_evolution(request: Request, db: Session = Depends(get_db)):
         return JSONResponse(
             {"status": "error", "message": str(e)},
             status_code=500
+        )
+
+
+async def processar_imagem_recebida(telefone: str, message: dict, db: Session):
+    """
+    Processa imagem recebida e extrai chave NFe automaticamente
+
+    Fluxo:
+    1. Envia "📷 Analisando imagem..."
+    2. Tenta extrair chave (pyzbar → Google Vision)
+    3. Se encontrar, valida e processa como chave NFe
+    4. Se não encontrar, pede foto melhor ou digitar chave
+    """
+    from app.services.whatsapp import whatsapp_service
+    from app.handlers.mensagem import MensagemHandler
+
+    # 1. Enviar mensagem de processamento
+    await whatsapp_service.enviar_mensagem(telefone, "📷 Analisando imagem...")
+
+    try:
+        # 2. Processar imagem
+        resultado = await image_reader_service.processar_imagem(message)
+
+        if resultado["sucesso"] and resultado["chave"]:
+            # Chave encontrada!
+            chave = resultado["chave"]
+            metodo = resultado["metodo"]
+
+            logger.info(f"Chave extraída de imagem ({metodo}): {chave}")
+
+            # 3. Processar como mensagem de texto (chave NFe)
+            handler = MensagemHandler(db)
+            await handler.processar_mensagem(telefone, chave)
+
+        else:
+            # Não conseguiu extrair chave
+            erro = resultado.get("erro", "Não consegui ler a chave")
+            logger.warning(f"Falha ao extrair chave de imagem: {erro}")
+
+            await whatsapp_service.enviar_mensagem(
+                telefone,
+                "❌ Não consegui ler a chave na imagem.\n\n"
+                "Tenta:\n"
+                "• Mandar uma foto mais clara\n"
+                "• Focar no código de barras/QR Code\n"
+                "• Ou digitar os 44 números da chave"
+            )
+
+    except Exception as e:
+        logger.error(f"Erro ao processar imagem: {e}")
+        await whatsapp_service.enviar_mensagem(
+            telefone,
+            "😕 Erro ao processar a imagem. Tenta de novo ou digita a chave."
         )
 
 
