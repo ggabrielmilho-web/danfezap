@@ -79,14 +79,17 @@ async def webhook_uazapi(request: Request, db: Session = Depends(get_db)):
         payload = await request.json()
         logger.info(f"Webhook UazAPI recebido: {payload}")
 
+        # Dados da mensagem estão aninhados em "message"
+        message = payload.get("message", {})
+
         # Ignorar mensagens enviadas por nós
-        from_me = payload.get("fromMe", False)
+        from_me = message.get("fromMe", False)
         if from_me:
             logger.info("Mensagem ignorada: enviada por nós")
             return JSONResponse({"status": "ignored", "reason": "from_me"})
 
-        # Extrair remetente
-        sender = payload.get("sender", "")
+        # Preferir sender_pn (número real) sobre sender (pode ser LID)
+        sender = message.get("sender_pn") or message.get("sender", "")
         if not sender:
             logger.warning("Webhook sem sender")
             return JSONResponse({"status": "error", "message": "sender not found"})
@@ -94,17 +97,17 @@ async def webhook_uazapi(request: Request, db: Session = Depends(get_db)):
         # Extrair telefone (remover @s.whatsapp.net ou @lid)
         telefone = sender.replace("@s.whatsapp.net", "").replace("@lid", "")
 
-        message_type = payload.get("messageType", "")
-        file_url = payload.get("fileURL", "")
+        message_type = message.get("messageType", "").lower()
+        file_url = message.get("fileURL", "") or message.get("mediaUrl", "")
 
         # Verificar se é imagem
-        if message_type == "imageMessage":
+        if message_type in ("image", "imagemessage") or message.get("mediaType", "").lower() == "image":
             logger.info(f"Imagem recebida de {telefone}")
             await processar_imagem_recebida(telefone, file_url, db)
             return JSONResponse({"status": "success", "message": "image_processed"})
 
         # Mensagem de texto
-        texto = payload.get("text", "")
+        texto = message.get("text", "") or message.get("content", "")
         if not texto:
             logger.info(f"Mensagem sem texto ignorada (tipo: {message_type})")
             return JSONResponse({"status": "ignored", "reason": "no_text"})
