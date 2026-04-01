@@ -45,7 +45,7 @@ class ImageReaderService:
                 logger.error("Campo content inválido ou ausente")
                 return None
 
-            # 1. Tenta download da URL completa
+            # 1. Tenta download da URL completa e valida se é imagem real
             file_url = content.get("URL", "")
             if file_url:
                 logger.info(f"Baixando imagem de: {file_url}")
@@ -53,10 +53,16 @@ class ImageReaderService:
                 async with httpx.AsyncClient(timeout=30.0) as client:
                     response = await client.get(file_url, headers=headers)
                     if response.status_code == 200:
-                        image_bytes = response.content
-                        logger.info(f"Imagem baixada: {len(image_bytes)} bytes")
-                        return image_bytes
-                    logger.warning(f"Falha ao baixar URL ({response.status_code}), tentando thumbnail")
+                        candidate = response.content
+                        try:
+                            from PIL import Image as PILImage
+                            PILImage.open(BytesIO(candidate)).verify()
+                            logger.info(f"Imagem baixada e válida: {len(candidate)} bytes")
+                            return candidate
+                        except Exception:
+                            logger.warning("Arquivo baixado é criptografado (.enc), usando thumbnail")
+                    else:
+                        logger.warning(f"Falha ao baixar URL ({response.status_code}), usando thumbnail")
 
             # 2. Fallback: thumbnail em base64 já disponível no webhook
             thumbnail_b64 = content.get("JPEGThumbnail", "")
