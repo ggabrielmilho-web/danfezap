@@ -33,46 +33,43 @@ class ImageReaderService:
 
     async def baixar_imagem_uazapi(self, message_data: dict) -> Optional[bytes]:
         """
-        Obtém bytes da imagem do webhook da UazAPI.
-
-        Tenta em ordem:
-        1. Download da URL em message.content.URL
-        2. Thumbnail em base64 de message.content.JPEGThumbnail (fallback)
+        Obtém bytes da imagem via endpoint /message/download da UazAPI.
+        Fallback: thumbnail do webhook.
         """
         try:
-            content = message_data.get("content", {})
-            if not isinstance(content, dict):
-                logger.error("Campo content inválido ou ausente")
+            messageid = message_data.get("messageid", "")
+            if not messageid:
+                logger.error("messageid não encontrado no payload")
                 return None
 
-            # 1. Tenta download da URL completa e valida se é imagem real
-            file_url = content.get("URL", "")
-            if file_url:
-                logger.info(f"Baixando imagem de: {file_url}")
-                headers = {"token": self.uazapi_token}
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    response = await client.get(file_url, headers=headers)
-                    if response.status_code == 200:
-                        candidate = response.content
-                        try:
-                            from PIL import Image as PILImage
-                            PILImage.open(BytesIO(candidate)).verify()
-                            logger.info(f"Imagem baixada e válida: {len(candidate)} bytes")
-                            return candidate
-                        except Exception:
-                            logger.warning("Arquivo baixado é criptografado (.enc), usando thumbnail")
-                    else:
-                        logger.warning(f"Falha ao baixar URL ({response.status_code}), usando thumbnail")
+            logger.info(f"Baixando imagem via /message/download (id: {messageid})")
+            url = f"{config.UAZAPI_URL}/message/download"
+            headers = {"token": self.uazapi_token, "Content-Type": "application/json"}
+            payload = {"id": messageid, "return_base64": True, "return_link": False}
 
-            # 2. Fallback: thumbnail em base64 já disponível no webhook
-            thumbnail_b64 = content.get("JPEGThumbnail", "")
-            if thumbnail_b64:
-                logger.info("Usando JPEGThumbnail do webhook como fallback")
-                image_bytes = base64.b64decode(thumbnail_b64)
-                logger.info(f"Thumbnail decodificado: {len(image_bytes)} bytes")
-                return image_bytes
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(url, json=payload, headers=headers)
 
-            logger.error("Nenhuma fonte de imagem disponível no payload")
+                if response.status_code == 200:
+                    result = response.json()
+                    base64_data = result.get("base64Data", "")
+                    if base64_data:
+                        image_bytes = base64.b64decode(base64_data)
+                        logger.info(f"Imagem baixada via API: {len(image_bytes)} bytes")
+                        return image_bytes
+                    logger.warning("Resposta sem base64Data, usando thumbnail")
+                else:
+                    logger.warning(f"Erro no download ({response.status_code}): {response.text}, usando thumbnail")
+
+            # Fallback: thumbnail do webhook
+            content = message_data.get("content", {})
+            if isinstance(content, dict):
+                thumbnail_b64 = content.get("JPEGThumbnail", "")
+                if thumbnail_b64:
+                    logger.info("Usando JPEGThumbnail como fallback")
+                    return base64.b64decode(thumbnail_b64)
+
+            logger.error("Nenhuma fonte de imagem disponível")
             return None
 
         except Exception as e:
