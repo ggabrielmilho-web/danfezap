@@ -15,10 +15,9 @@ class Config:
     # Banco de dados
     DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://botdanfe:senha_segura@localhost:5432/danfezap")
 
-    # Evolution API (WhatsApp)
-    EVOLUTION_URL = os.getenv("EVOLUTION_URL", "http://localhost:8080")
-    EVOLUTION_APIKEY = os.getenv("EVOLUTION_APIKEY", "")
-    EVOLUTION_INSTANCE = os.getenv("EVOLUTION_INSTANCE", "")
+    # UazAPI (WhatsApp)
+    UAZAPI_URL = os.getenv("UAZAPI_URL", "https://free.uazapi.com")
+    UAZAPI_TOKEN = os.getenv("UAZAP_TOKEN", "")
 
     # URL base para webhooks (onde nossa aplicação recebe callbacks)
     WEBHOOK_BASE_URL = os.getenv("WEBHOOK_BASE_URL", "http://localhost:8000")
@@ -50,11 +49,8 @@ class Config:
         """Valida se as configurações essenciais estão definidas"""
         erros = []
 
-        if not cls.EVOLUTION_APIKEY:
-            erros.append("EVOLUTION_APIKEY não configurada")
-
-        if not cls.EVOLUTION_INSTANCE:
-            erros.append("EVOLUTION_INSTANCE não configurada")
+        if not cls.UAZAPI_TOKEN:
+            erros.append("UAZAP_TOKEN não configurada")
 
         if not cls.MERCADOPAGO_ACCESS_TOKEN:
             erros.append("MERCADOPAGO_ACCESS_TOKEN não configurada")

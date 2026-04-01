@@ -61,106 +61,68 @@ async def health_check():
     }
 
 
-@app.post("/webhook/evolution")
-async def webhook_evolution(request: Request, db: Session = Depends(get_db)):
+@app.post("/webhook/uazapi")
+async def webhook_uazapi(request: Request, db: Session = Depends(get_db)):
     """
-    Webhook para receber mensagens do WhatsApp via Evolution API
+    Webhook para receber mensagens do WhatsApp via UazAPI
 
     Payload esperado:
     {
-        "event": "messages.upsert",
-        "instance": "danfezap",
-        "data": {
-            "key": {
-                "remoteJid": "5511999999999@s.whatsapp.net",
-                "fromMe": false,
-                ...
-            },
-            "message": {
-                "conversation": "Texto da mensagem"
-            },
-            "messageType": "conversation",
-            "pushName": "Nome do Usuário"
-        }
+        "fromMe": false,
+        "sender": "5511999999999@s.whatsapp.net",
+        "messageType": "conversation",
+        "text": "Texto da mensagem",
+        "fileURL": "https://..." (para mídias)
     }
     """
     try:
-        # Receber payload
         payload = await request.json()
-        logger.info(f"Webhook Evolution recebido: {payload}")
-
-        # Verificar se é uma mensagem recebida (não enviada por nós)
-        event = payload.get("event")
-
-        if event != "messages.upsert":
-            logger.info(f"Evento ignorado: {event}")
-            return JSONResponse({"status": "ignored", "reason": "event not messages.upsert"})
-
-        # Extrair dados da mensagem
-        data = payload.get("data", {})
-        key = data.get("key", {})
-        message = data.get("message", {})
+        logger.info(f"Webhook UazAPI recebido: {payload}")
 
         # Ignorar mensagens enviadas por nós
-        from_me = key.get("fromMe", False)
+        from_me = payload.get("fromMe", False)
         if from_me:
             logger.info("Mensagem ignorada: enviada por nós")
             return JSONResponse({"status": "ignored", "reason": "from_me"})
 
-        # Extrair número do remetente
-        remote_jid = key.get("remoteJid", "")
-        remote_jid_alt = key.get("remoteJidAlt", "")
-
-        if not remote_jid and not remote_jid_alt:
-            logger.warning("Webhook sem remoteJid")
-            return JSONResponse({"status": "error", "message": "remoteJid not found"})
-
-        # Se for LID (@lid), usar o remoteJidAlt que tem o número real
-        if "@lid" in remote_jid and remote_jid_alt:
-            logger.info(f"LID detectado: {remote_jid} -> usando alt: {remote_jid_alt}")
-            remote_jid = remote_jid_alt
+        # Extrair remetente
+        sender = payload.get("sender", "")
+        if not sender:
+            logger.warning("Webhook sem sender")
+            return JSONResponse({"status": "error", "message": "sender not found"})
 
         # Extrair telefone (remover @s.whatsapp.net ou @lid)
-        telefone = remote_jid.replace("@s.whatsapp.net", "").replace("@lid", "")
+        telefone = sender.replace("@s.whatsapp.net", "").replace("@lid", "")
 
-        # Extrair texto da mensagem
-        texto = None
-        message_type = data.get("messageType", "")
+        message_type = payload.get("messageType", "")
+        file_url = payload.get("fileURL", "")
 
         # Verificar se é imagem
-        if message_type == "imageMessage" or "imageMessage" in message:
+        if message_type == "imageMessage":
             logger.info(f"Imagem recebida de {telefone}")
-
-            # Processar imagem (extrair chave automaticamente)
-            await processar_imagem_recebida(telefone, data, db)
+            await processar_imagem_recebida(telefone, file_url, db)
             return JSONResponse({"status": "success", "message": "image_processed"})
 
-        # Tentar diferentes formatos de mensagem de texto
-        if "conversation" in message:
-            texto = message["conversation"]
-        elif "extendedTextMessage" in message:
-            texto = message["extendedTextMessage"].get("text", "")
-
+        # Mensagem de texto
+        texto = payload.get("text", "")
         if not texto:
-            logger.info("Mensagem sem texto (pode ser mídia)")
+            logger.info(f"Mensagem sem texto ignorada (tipo: {message_type})")
             return JSONResponse({"status": "ignored", "reason": "no_text"})
 
         logger.info(f"Processando mensagem de {telefone}: {texto}")
-
-        # Processar mensagem de texto
         await processar_mensagem_recebida(telefone, texto, db)
 
         return JSONResponse({"status": "success", "message": "processed"})
 
     except Exception as e:
-        logger.error(f"Erro ao processar webhook Evolution: {e}")
+        logger.error(f"Erro ao processar webhook UazAPI: {e}")
         return JSONResponse(
             {"status": "error", "message": str(e)},
             status_code=500
         )
 
 
-async def processar_imagem_recebida(telefone: str, message: dict, db: Session):
+async def processar_imagem_recebida(telefone: str, file_url: str, db: Session):
     """
     Processa imagem recebida e extrai chave NFe automaticamente
 
@@ -178,7 +140,7 @@ async def processar_imagem_recebida(telefone: str, message: dict, db: Session):
 
     try:
         # 2. Processar imagem
-        resultado = await image_reader_service.processar_imagem(message)
+        resultado = await image_reader_service.processar_imagem(file_url)
 
         if resultado["sucesso"] and resultado["chave"]:
             # Chave encontrada!

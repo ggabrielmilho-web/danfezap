@@ -28,79 +28,40 @@ class ImageReaderService:
 
     def __init__(self):
         self.google_api_key = config.GOOGLE_VISION_API_KEY
-        self.evolution_url = config.EVOLUTION_URL
-        self.evolution_apikey = config.EVOLUTION_APIKEY
+        self.uazapi_token = config.UAZAPI_TOKEN
         self.google_vision_url = "https://vision.googleapis.com/v1/images:annotate"
 
-    def _get_headers(self):
-        """Headers para Evolution API"""
-        return {
-            "apikey": self.evolution_apikey,
-            "Content-Type": "application/json"
-        }
-
-    async def baixar_imagem_whatsapp(self, data: dict) -> Optional[bytes]:
+    async def baixar_imagem_uazapi(self, file_url: str) -> Optional[bytes]:
         """
-        Obtém bytes da imagem do webhook da Evolution API
-
-        Tenta em ordem:
-        1. base64 direto no webhook (imageMessage.base64 ou message.base64)
-        2. Evolution API getBase64FromMediaMessage (descriptografa a mídia)
+        Baixa a imagem recebida via UazAPI usando a fileURL do webhook
 
         Args:
-            data: Objeto data completo do webhook da Evolution API
+            file_url: URL da imagem fornecida pela UazAPI no webhook
 
         Returns:
             bytes da imagem ou None se falhar
         """
         try:
-            message = data.get("message", {})
-            image_message = message.get("imageMessage", {})
+            if not file_url:
+                logger.error("fileURL não informada")
+                return None
 
-            # 1. Tenta base64 direto no webhook
-            base64_data = image_message.get("base64") or message.get("base64") or data.get("base64")
-
-            if base64_data:
-                logger.info("Imagem recebida em base64 do webhook")
-                image_bytes = base64.b64decode(base64_data)
-                logger.info(f"Imagem decodificada: {len(image_bytes)} bytes")
-                return image_bytes
-
-            # 2. Chama Evolution API para descriptografar a mídia
-            logger.info("base64 não encontrado no webhook, buscando via Evolution API")
-            key = data.get("key", {})
-            instance = config.EVOLUTION_INSTANCE
-
-            url = f"{self.evolution_url}/chat/getBase64FromMediaMessage/{instance}"
-            payload = {
-                "message": {
-                    "key": key,
-                    "message": message
-                },
-                "convertToMp4": False
-            }
+            logger.info(f"Baixando imagem de: {file_url}")
+            headers = {"token": self.uazapi_token}
 
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(url, json=payload, headers=self._get_headers())
+                response = await client.get(file_url, headers=headers)
 
-                if response.status_code not in (200, 201):
-                    logger.error(f"Evolution API erro ao buscar mídia: Status {response.status_code} - {response.text}")
+                if response.status_code != 200:
+                    logger.error(f"Erro ao baixar imagem: Status {response.status_code}")
                     return None
 
-                result = response.json()
-                base64_data = result.get("base64")
-
-                if not base64_data:
-                    logger.error(f"Evolution API não retornou base64. Resposta: {result}")
-                    return None
-
-                logger.info("Imagem obtida via Evolution API getBase64FromMediaMessage")
-                image_bytes = base64.b64decode(base64_data)
-                logger.info(f"Imagem decodificada: {len(image_bytes)} bytes")
+                image_bytes = response.content
+                logger.info(f"Imagem baixada: {len(image_bytes)} bytes")
                 return image_bytes
 
         except Exception as e:
-            logger.error(f"Erro ao obter imagem: {e}")
+            logger.error(f"Erro ao baixar imagem: {e}")
             return None
 
     def extrair_chave_pyzbar(self, image_bytes: bytes) -> Optional[str]:
@@ -265,17 +226,17 @@ class ImageReaderService:
 
         return None
 
-    async def processar_imagem(self, message: dict) -> dict:
+    async def processar_imagem(self, file_url: str) -> dict:
         """
         Fluxo principal de processamento de imagem
 
-        1. Baixa imagem da Evolution API
+        1. Baixa imagem via fileURL da UazAPI
         2. Tenta pyzbar (código de barras/QR) - GRÁTIS
         3. Se falhar, tenta Google Vision OCR - Pago
         4. Se falhar, retorna erro
 
         Args:
-            message: Objeto message do webhook da Evolution API
+            file_url: URL da imagem fornecida pela UazAPI no webhook
 
         Returns:
             dict: {
@@ -289,7 +250,7 @@ class ImageReaderService:
             # 1. Baixar imagem
             logger.info("Iniciando processamento de imagem")
 
-            image_bytes = await self.baixar_imagem_whatsapp(message)
+            image_bytes = await self.baixar_imagem_uazapi(file_url)
 
             if not image_bytes:
                 return {
