@@ -98,12 +98,11 @@ async def webhook_uazapi(request: Request, db: Session = Depends(get_db)):
         telefone = sender.replace("@s.whatsapp.net", "").replace("@lid", "")
 
         message_type = message.get("messageType", "").lower()
-        file_url = message.get("fileURL", "") or message.get("mediaUrl", "")
 
         # Verificar se é imagem
         if message_type in ("image", "imagemessage") or message.get("mediaType", "").lower() == "image":
             logger.info(f"Imagem recebida de {telefone}")
-            await processar_imagem_recebida(telefone, file_url, db)
+            await processar_imagem_recebida(telefone, message, db)
             return JSONResponse({"status": "success", "message": "image_processed"})
 
         # Mensagem de texto
@@ -125,7 +124,7 @@ async def webhook_uazapi(request: Request, db: Session = Depends(get_db)):
         )
 
 
-async def processar_imagem_recebida(telefone: str, file_url: str, db: Session):
+async def processar_imagem_recebida(telefone: str, message: dict, db: Session):
     """
     Processa imagem recebida e extrai chave NFe automaticamente
 
@@ -143,7 +142,7 @@ async def processar_imagem_recebida(telefone: str, file_url: str, db: Session):
 
     try:
         # 2. Processar imagem
-        resultado = await image_reader_service.processar_imagem(file_url)
+        resultado = await image_reader_service.processar_imagem(message)
 
         if resultado["sucesso"] and resultado["chave"]:
             # Chave encontrada!

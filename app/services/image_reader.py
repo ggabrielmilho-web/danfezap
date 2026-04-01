@@ -31,37 +31,46 @@ class ImageReaderService:
         self.uazapi_token = config.UAZAPI_TOKEN
         self.google_vision_url = "https://vision.googleapis.com/v1/images:annotate"
 
-    async def baixar_imagem_uazapi(self, file_url: str) -> Optional[bytes]:
+    async def baixar_imagem_uazapi(self, message_data: dict) -> Optional[bytes]:
         """
-        Baixa a imagem recebida via UazAPI usando a fileURL do webhook
+        Obtém bytes da imagem do webhook da UazAPI.
 
-        Args:
-            file_url: URL da imagem fornecida pela UazAPI no webhook
-
-        Returns:
-            bytes da imagem ou None se falhar
+        Tenta em ordem:
+        1. Download da URL em message.content.URL
+        2. Thumbnail em base64 de message.content.JPEGThumbnail (fallback)
         """
         try:
-            if not file_url:
-                logger.error("fileURL não informada")
+            content = message_data.get("content", {})
+            if not isinstance(content, dict):
+                logger.error("Campo content inválido ou ausente")
                 return None
 
-            logger.info(f"Baixando imagem de: {file_url}")
-            headers = {"token": self.uazapi_token}
+            # 1. Tenta download da URL completa
+            file_url = content.get("URL", "")
+            if file_url:
+                logger.info(f"Baixando imagem de: {file_url}")
+                headers = {"token": self.uazapi_token}
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.get(file_url, headers=headers)
+                    if response.status_code == 200:
+                        image_bytes = response.content
+                        logger.info(f"Imagem baixada: {len(image_bytes)} bytes")
+                        return image_bytes
+                    logger.warning(f"Falha ao baixar URL ({response.status_code}), tentando thumbnail")
 
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(file_url, headers=headers)
-
-                if response.status_code != 200:
-                    logger.error(f"Erro ao baixar imagem: Status {response.status_code}")
-                    return None
-
-                image_bytes = response.content
-                logger.info(f"Imagem baixada: {len(image_bytes)} bytes")
+            # 2. Fallback: thumbnail em base64 já disponível no webhook
+            thumbnail_b64 = content.get("JPEGThumbnail", "")
+            if thumbnail_b64:
+                logger.info("Usando JPEGThumbnail do webhook como fallback")
+                image_bytes = base64.b64decode(thumbnail_b64)
+                logger.info(f"Thumbnail decodificado: {len(image_bytes)} bytes")
                 return image_bytes
 
+            logger.error("Nenhuma fonte de imagem disponível no payload")
+            return None
+
         except Exception as e:
-            logger.error(f"Erro ao baixar imagem: {e}")
+            logger.error(f"Erro ao obter imagem: {e}")
             return None
 
     def extrair_chave_pyzbar(self, image_bytes: bytes) -> Optional[str]:
@@ -226,17 +235,17 @@ class ImageReaderService:
 
         return None
 
-    async def processar_imagem(self, file_url: str) -> dict:
+    async def processar_imagem(self, message_data: dict) -> dict:
         """
         Fluxo principal de processamento de imagem
 
-        1. Baixa imagem via fileURL da UazAPI
+        1. Baixa imagem via content.URL ou thumbnail do webhook
         2. Tenta pyzbar (código de barras/QR) - GRÁTIS
         3. Se falhar, tenta Google Vision OCR - Pago
         4. Se falhar, retorna erro
 
         Args:
-            file_url: URL da imagem fornecida pela UazAPI no webhook
+            message_data: Objeto message do webhook da UazAPI
 
         Returns:
             dict: {
@@ -250,7 +259,7 @@ class ImageReaderService:
             # 1. Baixar imagem
             logger.info("Iniciando processamento de imagem")
 
-            image_bytes = await self.baixar_imagem_uazapi(file_url)
+            image_bytes = await self.baixar_imagem_uazapi(message_data)
 
             if not image_bytes:
                 return {
