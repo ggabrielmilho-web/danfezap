@@ -49,3 +49,27 @@ def init_db():
     """
     from . import models
     Base.metadata.create_all(bind=engine)
+
+
+def migrate_db():
+    """
+    Aplica migrações incrementais de forma idempotente.
+    Usa ADD COLUMN IF NOT EXISTS para não quebrar banco existente.
+    """
+    with engine.connect() as conn:
+        conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS plano VARCHAR(10)"
+            )
+        )
+        conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS aguardando_escolha_plano BOOLEAN DEFAULT FALSE"
+            )
+        )
+        conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE pagamentos ADD COLUMN IF NOT EXISTS plano VARCHAR(10)"
+            )
+        )
+        conn.commit()

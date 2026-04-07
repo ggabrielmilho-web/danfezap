@@ -39,6 +39,10 @@ class Usuario(Base):
     aguardando_email_principal = Column(Boolean, default=False)
     aguardando_email_secundario = Column(Boolean, default=False)
 
+    # Plano de assinatura e estado de escolha
+    plano = Column(String(10), nullable=True)              # "basico" | "pro"
+    aguardando_escolha_plano = Column(Boolean, default=False)
+
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
@@ -123,6 +127,7 @@ class Pagamento(Base):
     data_pagamento = Column(DateTime)
     id_transacao_mp = Column(String(100))
     status = Column(String(20), default='pendente')  # pendente, aprovado, rejeitado
+    plano = Column(String(10), nullable=True)         # "basico" | "pro"
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 

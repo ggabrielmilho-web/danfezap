@@ -15,28 +15,12 @@ import base64
 
 # Mensagens do bot
 MENSAGENS = {
-    "boas_vindas": """
-🚛 *DanfeZap* - Bem-vindo!
-
-Consulte DANFE e XML em segundos.
-
-📸 *Como usar:*
-• Tira foto do código de barras da nota
-• Ou digita a chave de 44 dígitos
-
-📧 Receba também por email (Pode Cadastrar até DOIS email)!
-
-⚠️ Foto da nota inteira não funciona, foca só no código de barras!
-
-✅ Você tem *5 consultas grátis* pra testar!
-
-*Comandos:*
-• *status* - Ver suas consultas
-• *email* - Cadastrar/ver emails
-• *assinar* - R$14,90/mês (100 consultas)
-
-Manda a foto ou a chave pra começar 👇
-""",
+    "boas_vindas": (
+        "🔥 Bem-vindo ao DanfeZap!\n\n"
+        "Você ganhou *2 consultas grátis* 👇\n\n"
+        "Manda agora a *foto* ou o *print da chave* da NF-e\n"
+        "e receba o XML + DANFE em segundos 📄"
+    ),
 
     "instrucoes": """
 📋 *Como usar o bot:*
@@ -80,35 +64,45 @@ Confere e manda de novo!
 Aguarda uns 5-10 minutos e tenta de novo.
 """,
 
-    "consultas_gratis_acabou": """
-😕 Suas 5 consultas grátis acabaram!
+    "consultas_gratis_acabou": (
+        "🚫 Suas consultas grátis acabaram\n\n"
+        "⚡ Isso aqui economiza um tempo absurdo no dia a dia\n\n"
+        "Pra continuar usando 👇\n\n"
+        "💼 *1 — Básico* R$14,90 (100/mês)\n"
+        "⚡ *2 — Profissional* R$49 (uso no dia a dia)\n\n"
+        "👉 Recomendado pra quem usa com frequência\n\n"
+        "Qual você quer liberar? Responde *1* ou *2*"
+    ),
 
-Gostou do serviço? Assina por apenas *R$14,90/mês* e libera *100 consultas*.
+    "assinatura_vencida": (
+        "⏳ Sua assinatura venceu!\n\n"
+        "⚡ Isso aqui economiza um tempo absurdo no dia a dia\n\n"
+        "Renova pra continuar usando 👇\n\n"
+        "💼 *1 — Básico* R$14,90 (100/mês)\n"
+        "⚡ *2 — Profissional* R$49 (uso no dia a dia)\n\n"
+        "Qual você quer? Responde *1* ou *2*"
+    ),
 
-Gerando seu Pix... 👇
-""",
+    "limite_atingido": (
+        "⚠️ Você atingiu o limite de consultas do plano atual.\n\n"
+        "Suas consultas renovam no próximo pagamento.\n\n"
+        "Digita *assinar* pra ver as opções."
+    ),
 
-    "assinatura_vencida": """
-⚠️ Sua assinatura venceu!
+    "escolher_plano": (
+        "Qual plano você quer?\n\n"
+        "💼 *1 — Básico* R$14,90 (100 consultas/mês)\n"
+        "⚡ *2 — Profissional* R$49 (uso livre)\n\n"
+        "Responde *1* ou *2*"
+    ),
 
-Renova por *R$14,90* e libera mais *100 consultas*.
+    "uso_extremo": (
+        "⚠️ Uso muito acima do normal detectado.\n\n"
+        "Fala com a gente pra liberar um plano personalizado 😉\n"
+        "📞 (34) 99943-4613"
+    ),
 
-Gerando seu Pix... 👇
-""",
-
-    "limite_atingido": """
-⚠️ Você atingiu o limite de 100 consultas desse período.
-
-Suas consultas renovam quando você fizer o próximo pagamento.
-
-Digite *assinar* pra renovar agora.
-""",
-
-    "processando": """
-⏳ Buscando o DANFE...
-
-Aguarda só um pouquinho!
-""",
+    "processando": "🔍 Buscando sua nota...",
 
     "erro_api": """
 ❌ Deu um problema na consulta.
@@ -116,11 +110,7 @@ Aguarda só um pouquinho!
 Tenta de novo em alguns minutos.
 """,
 
-    "sucesso": """
-✅ DANFE encontrado!
-
-Enviando PDF e XML...
-""",
+    "sucesso": "✅ Pronto! Aqui está 👇",
 
     "pagamento_confirmado": """
 ✅ Pagamento confirmado!
@@ -139,11 +129,9 @@ Consultas usadas: {consultas_usadas}/{limite}
 {info_extra}
 """,
 
-    "perguntar_email_principal": """
-📧 Quer receber por email também?
-
-Manda seu email ou "não" pra pular.
-""",
+    "perguntar_email_principal": (
+        "📩 Se quiser receber automaticamente no email também, me manda seu email aqui 😉"
+    ),
 
     "perguntar_email_secundario": """
 📧 Quer cadastrar um segundo email? (contador, transportadora, etc.)
@@ -230,7 +218,15 @@ async def verificar_pode_consultar(usuario) -> dict:
             "acao": "pedir_renovacao"
         }
 
-    # Caso 3: É assinante ativo, verifica limite mensal
+    # Caso 3: É assinante ativo, verifica uso extremo (plano Pro acima de 1500)
+    if getattr(usuario, "plano", None) == "pro" and usuario.consultas_mes > 1500:
+        return {
+            "pode": False,
+            "motivo": "uso_extremo",
+            "acao": "contato_suporte"
+        }
+
+    # Caso 4: É assinante ativo, verifica limite mensal
     if usuario.consultas_mes >= usuario.limite_consultas:
         return {
             "pode": False,
@@ -274,13 +270,18 @@ class MensagemHandler:
         # 1. Buscar ou criar usuário
         usuario, usuario_novo = self._buscar_ou_criar_usuario(telefone_limpo)
 
-        # 2. NOVO: Verificar se está aguardando resposta de email
+        # 2. Verificar se está aguardando escolha de plano
+        if getattr(usuario, "aguardando_escolha_plano", False):
+            await self._processar_escolha_plano(usuario, telefone_limpo, texto)
+            return
+
+        # 3. Verificar se está aguardando resposta de email
         if usuario.aguardando_email_principal or usuario.aguardando_email_secundario:
             processou = await self._processar_resposta_email(usuario, telefone_limpo, texto)
             if processou:
                 return  # Email processado, para por aqui
 
-        # 3. Processar comando/texto
+        # 4. Processar comando/texto
         texto_limpo = texto.strip().lower()
 
         # Comando: status
@@ -295,8 +296,9 @@ class MensagemHandler:
 
         # Comando: assinar
         if texto_limpo == "assinar":
-            await whatsapp_service.enviar_mensagem(telefone_limpo, "💳 Gerando seu Pix... 👇")
-            await self._solicitar_pagamento(usuario, telefone_limpo)
+            usuario.aguardando_escolha_plano = True
+            self.db.commit()
+            await whatsapp_service.enviar_mensagem(telefone_limpo, MENSAGENS["escolher_plano"])
             return
 
         # Comando: email
@@ -304,35 +306,36 @@ class MensagemHandler:
             await self._gerenciar_emails(usuario, telefone_limpo)
             return
 
-        # 4. Verificar se pode consultar
+        # 5. Verificar se pode consultar
         verificacao = await verificar_pode_consultar(usuario)
 
         if not verificacao["pode"]:
-            if verificacao["motivo"] == "consultas_gratis_acabou":
+            motivo = verificacao["motivo"]
+            if motivo in ("consultas_gratis_acabou", "assinatura_vencida"):
+                usuario.aguardando_escolha_plano = True
+                self.db.commit()
                 await whatsapp_service.enviar_mensagem(
                     telefone_limpo,
-                    MENSAGENS["consultas_gratis_acabou"]
+                    MENSAGENS[motivo]
                 )
-                await self._solicitar_pagamento(usuario, telefone_limpo)
-            elif verificacao["motivo"] == "assinatura_vencida":
-                await whatsapp_service.enviar_mensagem(
-                    telefone_limpo,
-                    MENSAGENS["assinatura_vencida"]
-                )
-                await self._solicitar_pagamento(usuario, telefone_limpo)
-            elif verificacao["motivo"] == "limite_atingido":
+            elif motivo == "limite_atingido":
                 await whatsapp_service.enviar_mensagem(
                     telefone_limpo,
                     MENSAGENS["limite_atingido"]
                 )
+            elif motivo == "uso_extremo":
+                await whatsapp_service.enviar_mensagem(
+                    telefone_limpo,
+                    MENSAGENS["uso_extremo"]
+                )
             return
 
-        # 5. Verificar se é uma chave de NFe (somente números)
+        # 6. Verificar se é uma chave de NFe (somente números)
         if texto_limpo.replace(" ", "").isdigit():
             await self._processar_chave_nfe(usuario, telefone_limpo, texto_limpo)
             return
 
-        # 6. Mensagem não reconhecida - enviar resposta padrão
+        # 7. Mensagem não reconhecida - enviar resposta padrão
         # Não enviar se for usuário novo (já recebeu boas-vindas)
         if not usuario_novo:
             await whatsapp_service.enviar_mensagem(telefone_limpo, MENSAGENS["nao_entendi"])
@@ -383,12 +386,12 @@ class MensagemHandler:
 
         if not usuario.assinante:
             # Usuário não-assinante (modo grátis)
-            consultas_usadas = 5 - usuario.consultas_gratis
+            consultas_usadas = config.CONSULTAS_GRATIS - usuario.consultas_gratis
             mensagem = MENSAGENS["status"].format(
                 status_texto="Conta gratuita",
                 consultas_usadas=consultas_usadas,
-                limite=5,
-                info_extra="Digite *assinar* pra ter 100 consultas/mês"
+                limite=config.CONSULTAS_GRATIS,
+                info_extra="Digite *assinar* pra ver os planos disponíveis"
             )
         else:
             # Usuário assinante
@@ -409,12 +412,38 @@ class MensagemHandler:
 
         await whatsapp_service.enviar_mensagem(usuario.telefone, mensagem)
 
-    async def _solicitar_pagamento(self, usuario: Usuario, telefone: str):
+    async def _processar_escolha_plano(self, usuario: Usuario, telefone: str, texto: str):
+        """Processa a escolha de plano (1=básico, 2=pro) e gera o Pix correspondente."""
+        texto_limpo = texto.strip().lower()
+
+        if texto_limpo in ("1", "basico", "básico"):
+            plano = "basico"
+            valor = config.VALOR_PLANO_BASICO
+        elif texto_limpo in ("2", "pro", "profissional"):
+            plano = "pro"
+            valor = config.VALOR_PLANO_PRO
+        else:
+            await whatsapp_service.enviar_mensagem(telefone, MENSAGENS["escolher_plano"])
+            return
+
+        usuario.aguardando_escolha_plano = False
+        usuario.plano = plano
+        self.db.commit()
+
+        await whatsapp_service.enviar_mensagem(telefone, "💳 Gerando seu Pix... 👇")
+        await self._solicitar_pagamento(usuario, telefone, plano=plano, valor=valor)
+
+    async def _solicitar_pagamento(self, usuario: Usuario, telefone: str, plano: str = "basico", valor: float = None):
         """Solicita pagamento para renovar assinatura"""
+        if valor is None:
+            valor = config.VALOR_PLANO_BASICO
+
         # Gerar Pix
         resultado_pix = pagamento_service.gerar_pix(
             usuario_id=usuario.id,
-            telefone=telefone
+            telefone=telefone,
+            valor=valor,
+            plano=plano
         )
 
         if not resultado_pix["sucesso"]:
@@ -427,9 +456,10 @@ class MensagemHandler:
         # Salvar pagamento no banco
         pagamento = Pagamento(
             usuario_id=usuario.id,
-            valor=config.VALOR_ASSINATURA,
+            valor=valor,
             id_transacao_mp=resultado_pix["id_transacao"],
-            status="pendente"
+            status="pendente",
+            plano=plano
         )
         self.db.add(pagamento)
         self.db.commit()

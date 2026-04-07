@@ -35,14 +35,23 @@ class Config:
     # Resend API (envio de emails)
     RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 
+    # Admin (kill switch)
+    ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
+
     # Configurações da aplicação
-    VALOR_ASSINATURA = float(os.getenv("VALOR_ASSINATURA", "14.90"))
+    VALOR_ASSINATURA = float(os.getenv("VALOR_ASSINATURA", "14.90"))  # retrocompatibilidade → aponta para plano básico
     DIAS_TRIAL = int(os.getenv("DIAS_TRIAL", "7"))  # Mantido para compatibilidade
     DIAS_ASSINATURA = int(os.getenv("DIAS_ASSINATURA", "30"))
 
     # Novas configurações - sistema de consultas
-    CONSULTAS_GRATIS = int(os.getenv("CONSULTAS_GRATIS", "5"))
+    CONSULTAS_GRATIS = int(os.getenv("CONSULTAS_GRATIS", "2"))
     LIMITE_CONSULTAS_MES = int(os.getenv("LIMITE_CONSULTAS_MES", "100"))
+
+    # Planos de assinatura
+    VALOR_PLANO_BASICO  = float(os.getenv("VALOR_PLANO_BASICO", "14.90"))
+    VALOR_PLANO_PRO     = float(os.getenv("VALOR_PLANO_PRO", "49.00"))
+    LIMITE_PLANO_BASICO = int(os.getenv("LIMITE_PLANO_BASICO", "100"))
+    LIMITE_PLANO_PRO    = int(os.getenv("LIMITE_PLANO_PRO", "1000"))
 
     @classmethod
     def validar_config(cls):

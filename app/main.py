@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import logging
 
-from .database import get_db, init_db
+from .database import get_db, init_db, migrate_db
 from .models import Usuario, Pagamento
 from .handlers.mensagem import processar_mensagem_recebida
 from .services.pagamento import pagamento_service
@@ -26,6 +26,9 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Kill switch — flag em memória (True por padrão, reseta para True a cada restart)
+_bot_ativo: bool = True
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -38,6 +41,13 @@ async def startup_event():
         logger.info("Banco de dados inicializado com sucesso")
     except Exception as e:
         logger.error(f"Erro ao inicializar banco de dados: {e}")
+
+    # Aplicar migrações incrementais
+    try:
+        migrate_db()
+        logger.info("Migrações aplicadas com sucesso")
+    except Exception as e:
+        logger.error(f"Erro ao aplicar migrações: {e}")
 
     logger.info("Aplicação iniciada!")
 
@@ -81,6 +91,10 @@ async def webhook_uazapi(request: Request, db: Session = Depends(get_db)):
 
         # Dados da mensagem estão aninhados em "message"
         message = payload.get("message", {})
+
+        # Kill switch
+        if not _bot_ativo:
+            return JSONResponse({"status": "bot_offline"})
 
         # Ignorar mensagens enviadas por nós
         from_me = message.get("fromMe", False)
@@ -162,12 +176,19 @@ async def processar_imagem_recebida(telefone: str, message: dict, db: Session):
 
             await whatsapp_service.enviar_mensagem(
                 telefone,
-                "❌ Não consegui ler a chave na imagem.\n\n"
-                "Tenta:\n"
-                "• Mandar uma foto mais clara\n"
-                "• Focar no código de barras/QR Code\n"
-                "• Ou digitar os 44 números da chave"
+                "❌ Não consegui identificar a chave 😕\n\n"
+                "👉 Tenta assim:\n"
+                "• Foto mais de perto\n"
+                "• Foca só no código de barras\n"
+                "• Ou digita os 44 números\n\n"
+                "Exemplo 👇"
             )
+
+            # Enviar imagem de exemplo
+            import pathlib
+            exemplo = pathlib.Path(__file__).parent / "assets" / "exemplo_danfe.jpg"
+            if exemplo.exists():
+                await whatsapp_service.enviar_imagem(telefone, exemplo.read_bytes())
 
     except Exception as e:
         logger.error(f"Erro ao processar imagem: {e}")
@@ -242,12 +263,16 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
             db.commit()
             return JSONResponse({"status": "user_not_found"})
 
-        # Renovar/ativar assinatura
+        # Renovar/ativar assinatura — respeitar o plano pago
+        plano = pagamento.plano or "basico"
+        limite = config.LIMITE_PLANO_PRO if plano == "pro" else config.LIMITE_PLANO_BASICO
+
         usuario.assinante = True
-        usuario.consultas_mes = 0  # RESETA O CONTADOR (libera 100 consultas)
+        usuario.plano = plano
+        usuario.consultas_mes = 0  # RESETA O CONTADOR
         usuario.consultas_gratis = 0  # Zera consultas grátis (não precisa mais)
         usuario.data_pagamento = datetime.now().date()
-        usuario.limite_consultas = config.LIMITE_CONSULTAS_MES  # 100
+        usuario.limite_consultas = limite
 
         # SEMPRE adiciona 30 dias a partir de AGORA (cancela trial se existir)
         usuario.data_expiracao = datetime.now() + timedelta(days=config.DIAS_ASSINATURA)
@@ -278,6 +303,36 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
             {"status": "error", "message": str(e)},
             status_code=500
         )
+
+
+def _verificar_admin_token(request: Request):
+    token = request.headers.get("Authorization", "").replace("Bearer ", "")
+    if not config.ADMIN_TOKEN or token != config.ADMIN_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+@app.post("/admin/bot/off")
+async def bot_off(request: Request):
+    _verificar_admin_token(request)
+    global _bot_ativo
+    _bot_ativo = False
+    logger.warning("🔴 BOT DESLIGADO via admin endpoint")
+    return {"status": "offline"}
+
+
+@app.post("/admin/bot/on")
+async def bot_on(request: Request):
+    _verificar_admin_token(request)
+    global _bot_ativo
+    _bot_ativo = True
+    logger.info("🟢 BOT LIGADO via admin endpoint")
+    return {"status": "online"}
+
+
+@app.get("/admin/bot/status")
+async def bot_status(request: Request):
+    _verificar_admin_token(request)
+    return {"status": "online" if _bot_ativo else "offline"}
 
 
 @app.get("/stats")

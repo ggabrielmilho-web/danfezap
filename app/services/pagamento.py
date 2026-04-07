@@ -22,14 +22,15 @@ class PagamentoService:
         # Inicializar SDK do Mercado Pago
         self.sdk = mercadopago.SDK(config.MERCADOPAGO_ACCESS_TOKEN)
 
-    def gerar_pix(self, usuario_id: int, telefone: str, valor: Optional[float] = None) -> dict:
+    def gerar_pix(self, usuario_id: int, telefone: str, valor: Optional[float] = None, plano: str = "basico") -> dict:
         """
         Gera cobrança Pix via Mercado Pago
 
         Args:
             usuario_id: ID do usuário no banco de dados
             telefone: Telefone do usuário
-            valor: Valor da cobrança (padrão: config.VALOR_ASSINATURA)
+            valor: Valor da cobrança (padrão: config.VALOR_PLANO_BASICO)
+            plano: "basico" ou "pro"
 
         Returns:
             dict: {
@@ -37,18 +38,21 @@ class PagamentoService:
                 "qr_code": str (código copia e cola),
                 "qr_code_base64": str (imagem do QR Code em base64),
                 "id_transacao": str (ID da transação no Mercado Pago),
+                "plano": str,
                 "erro": str ou None
             }
         """
         try:
             # Usar valor padrão se não fornecido
             if valor is None:
-                valor = config.VALOR_ASSINATURA
+                valor = config.VALOR_PLANO_BASICO
+
+            descricao = "Assinatura DanfeZap Pro - 30 dias" if plano == "pro" else "Assinatura DanfeZap - 30 dias"
 
             # Criar payload para pagamento
             payment_data = {
                 "transaction_amount": float(valor),
-                "description": f"Assinatura DanfeZap - 30 dias",
+                "description": descricao,
                 "payment_method_id": "pix",
                 "payer": {
                     "email": f"user{usuario_id}@danfezap.com",  # Email fictício
@@ -131,6 +135,7 @@ class PagamentoService:
                 "qr_code": qr_code,
                 "qr_code_base64": qr_code_base64,
                 "id_transacao": id_transacao,
+                "plano": plano,
                 "erro": None
             }
 
