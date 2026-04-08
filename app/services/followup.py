@@ -30,6 +30,10 @@ MSGS_FOLLOWUP = {
 
 
 async def _checar_e_enviar():
+    if not config.FOLLOWUP_ATIVO:
+        logger.info("Follow-up desativado (FOLLOWUP_ATIVO=false)")
+        return
+
     db = SessionLocal()
     try:
         agora = datetime.now()

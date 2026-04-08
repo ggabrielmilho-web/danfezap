@@ -38,6 +38,9 @@ class Config:
     # Admin (kill switch)
     ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 
+    # Follow-up automático (false no Portainer pra desativar)
+    FOLLOWUP_ATIVO = os.getenv("FOLLOWUP_ATIVO", "true").lower() == "true"
+
     # Configurações da aplicação
     VALOR_ASSINATURA = float(os.getenv("VALOR_ASSINATURA", "14.90"))  # retrocompatibilidade → aponta para plano básico
     DIAS_TRIAL = int(os.getenv("DIAS_TRIAL", "7"))  # Mantido para compatibilidade
