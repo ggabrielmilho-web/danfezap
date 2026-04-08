@@ -49,6 +49,13 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Erro ao aplicar migrações: {e}")
 
+    # Iniciar scheduler de follow-up
+    try:
+        from .services.followup import iniciar_scheduler
+        iniciar_scheduler(app)
+    except Exception as e:
+        logger.error(f"Erro ao iniciar scheduler de follow-up: {e}")
+
     logger.info("Aplicação iniciada!")
 
 

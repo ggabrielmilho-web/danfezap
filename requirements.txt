@@ -15,3 +15,6 @@ Pillow==10.1.0
 
 # Envio de emails
 resend==2.0.0
+
+# Scheduler para follow-up automático
+apscheduler==3.10.4
