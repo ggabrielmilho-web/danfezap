@@ -68,8 +68,8 @@ Aguarda uns 5-10 minutos e tenta de novo.
         "🚫 Suas consultas grátis acabaram\n\n"
         "⚡ Isso aqui economiza um tempo absurdo no dia a dia\n\n"
         "Pra continuar usando 👇\n\n"
-        "💼 *1 — Básico* R$14,90 (100/mês)\n"
-        "⚡ *2 — Profissional* R$49 (uso no dia a dia)\n\n"
+        "💼 *1 — Básico* R$14,90 (100 consultas/mês)\n"
+        "⚡ *2 — Profissional* R$49 (Ilimitado)\n\n"
         "👉 Recomendado pra quem usa com frequência\n\n"
         "Qual você quer liberar? Responde *1* ou *2*"
     ),
@@ -78,8 +78,8 @@ Aguarda uns 5-10 minutos e tenta de novo.
         "⏳ Sua assinatura venceu!\n\n"
         "⚡ Isso aqui economiza um tempo absurdo no dia a dia\n\n"
         "Renova pra continuar usando 👇\n\n"
-        "💼 *1 — Básico* R$14,90 (100/mês)\n"
-        "⚡ *2 — Profissional* R$49 (uso no dia a dia)\n\n"
+        "💼 *1 — Básico* R$14,90 (100 consultas/mês)\n"
+        "⚡ *2 — Profissional* R$49 (Ilimitado)\n\n"
         "Qual você quer? Responde *1* ou *2*"
     ),
 
@@ -92,7 +92,7 @@ Aguarda uns 5-10 minutos e tenta de novo.
     "escolher_plano": (
         "Qual plano você quer?\n\n"
         "💼 *1 — Básico* R$14,90 (100 consultas/mês)\n"
-        "⚡ *2 — Profissional* R$49 (uso livre)\n\n"
+        "⚡ *2 — Profissional* R$49 (Ilimitado)\n\n"
         "Responde *1* ou *2*"
     ),
 
