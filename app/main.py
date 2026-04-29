@@ -156,9 +156,22 @@ async def processar_imagem_recebida(telefone: str, message: dict, db: Session):
     4. Se não encontrar, pede foto melhor ou digitar chave
     """
     from app.services.whatsapp import whatsapp_service
-    from app.handlers.mensagem import MensagemHandler
+    from app.handlers.mensagem import MensagemHandler, verificar_pode_consultar, MENSAGENS
 
-    # 1. Enviar mensagem de processamento
+    # 1. Checar cota antes de processar — evita "Analisando..." seguido de mensagem de bloqueio
+    telefone_limpo = ''.join(filter(str.isdigit, telefone))
+    usuario = db.query(Usuario).filter(Usuario.telefone == telefone_limpo).first()
+    if usuario:
+        verificacao = await verificar_pode_consultar(usuario)
+        if not verificacao["pode"]:
+            motivo = verificacao["motivo"]
+            if motivo in ("consultas_gratis_acabou", "assinatura_vencida"):
+                usuario.aguardando_escolha_plano = True
+                db.commit()
+            await whatsapp_service.enviar_mensagem(telefone_limpo, MENSAGENS[motivo])
+            return
+
+    # 2. Enviar mensagem de processamento
     await whatsapp_service.enviar_mensagem(telefone, "📷 Analisando imagem...")
 
     try:

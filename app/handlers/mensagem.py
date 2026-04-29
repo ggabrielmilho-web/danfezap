@@ -133,23 +133,8 @@ Consultas usadas: {consultas_usadas}/{limite}
         "📩 Se quiser receber automaticamente no email também, me manda seu email aqui 😉"
     ),
 
-    "perguntar_email_secundario": """
-📧 Quer cadastrar um segundo email? (contador, transportadora, etc.)
-
-Manda o email ou "não" pra pular.
-""",
-
     "email_cadastrado": """
 ✅ Email cadastrado: {email}
-""",
-
-    "emails_cadastrados_completo": """
-✅ Emails cadastrados!
-
-Principal: {email1}
-Secundário: {email2}
-
-Enviando DANFE pros seus emails... 📤
 """,
 
     "email_enviado_automatico": """
@@ -168,14 +153,11 @@ Manda um email válido (ex: seuemail@gmail.com) ou "não" pra pular.
 ⚠️ Erro ao enviar email. Mas o DANFE foi enviado aqui no WhatsApp!
 """,
 
-    "ver_emails": """
-📧 *Emails cadastrados:*
-
-Principal: {email1}
-Secundário: {email2}
-
-Quer alterar? Manda o novo email ou "limpar" pra apagar.
-""",
+    "ver_emails": (
+        "📧 *Email cadastrado:*\n\n"
+        "{email}\n\n"
+        "Quer alterar? Manda o novo email ou *limpar* pra apagar."
+    ),
 
     "nao_entendi": """
 Não entendi 😅
@@ -568,12 +550,11 @@ class MensagemHandler:
         # Enviar mensagem de sucesso
         await whatsapp_service.enviar_mensagem(telefone, MENSAGENS["sucesso"])
 
-        # NOVO: Enviar por email se cadastrado
-        emails_para_enviar = []
+        # Enviar por email se cadastrado
         if usuario.email:
-            emails_para_enviar.append(usuario.email)
-        if usuario.email_secundario:
-            emails_para_enviar.append(usuario.email_secundario)
+            emails_para_enviar = [usuario.email]
+        else:
+            emails_para_enviar = []
 
         if emails_para_enviar:
             # Já tem email cadastrado → enviar automaticamente
@@ -646,20 +627,15 @@ class MensagemHandler:
                 )
                 return True
 
-            # Se for email válido, salva
+            # Se for email válido, salva e encerra
             if self._validar_email(texto):
                 usuario.email = texto.strip()
                 usuario.aguardando_email_principal = False
-                usuario.aguardando_email_secundario = True  # Perguntar segundo
                 self.db.commit()
 
                 await whatsapp_service.enviar_mensagem(
                     telefone,
                     MENSAGENS["email_cadastrado"].format(email=usuario.email)
-                )
-                await whatsapp_service.enviar_mensagem(
-                    telefone,
-                    MENSAGENS["perguntar_email_secundario"]
                 )
                 return True
 
@@ -676,46 +652,6 @@ class MensagemHandler:
             self.db.commit()
             return False
 
-        # Aguardando email secundário
-        if usuario.aguardando_email_secundario:
-            # Se disser não, finaliza cadastro
-            if texto_limpo in ["não", "nao", "n"]:
-                usuario.aguardando_email_secundario = False
-                self.db.commit()
-                await whatsapp_service.enviar_mensagem(
-                    telefone,
-                    f"✅ Email cadastrado!\n\nPrincipal: {usuario.email}"
-                )
-                return True
-
-            # Se for email válido, salva
-            if self._validar_email(texto):
-                usuario.email_secundario = texto.strip()
-                usuario.aguardando_email_secundario = False
-                self.db.commit()
-
-                await whatsapp_service.enviar_mensagem(
-                    telefone,
-                    MENSAGENS["emails_cadastrados_completo"].format(
-                        email1=usuario.email,
-                        email2=usuario.email_secundario
-                    )
-                )
-                return True
-
-            # Email inválido mas não é comando/chave → avisar
-            if not texto_limpo.replace(" ", "").isdigit() and texto_limpo not in ["status", "ajuda", "assinar", "email"]:
-                await whatsapp_service.enviar_mensagem(
-                    telefone,
-                    MENSAGENS["email_invalido"]
-                )
-                return True
-
-            # É comando ou chave → resetar estado e continuar fluxo normal
-            usuario.aguardando_email_secundario = False
-            self.db.commit()
-            return False
-
         return False
 
     async def _gerenciar_emails(self, usuario: Usuario, telefone: str):
@@ -726,22 +662,17 @@ class MensagemHandler:
             usuario: Objeto do usuário
             telefone: Número de telefone
         """
-        if not usuario.email and not usuario.email_secundario:
+        if not usuario.email:
             await whatsapp_service.enviar_mensagem(
                 telefone,
                 "📧 Você ainda não cadastrou nenhum email.\n\nFaça uma consulta e vou te perguntar se quer receber por email!"
             )
             return
 
-        email1 = usuario.email or "Não cadastrado"
-        email2 = usuario.email_secundario or "Não cadastrado"
-
         await whatsapp_service.enviar_mensagem(
             telefone,
-            MENSAGENS["ver_emails"].format(email1=email1, email2=email2)
+            MENSAGENS["ver_emails"].format(email=usuario.email)
         )
-
-        # TODO: implementar lógica de alteração/limpeza (fase 2)
 
 
 async def processar_mensagem_recebida(telefone: str, texto: str, db: Session):
