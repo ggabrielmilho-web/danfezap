@@ -171,11 +171,9 @@ async def processar_imagem_recebida(telefone: str, message: dict, db: Session):
             await whatsapp_service.enviar_mensagem(telefone_limpo, MENSAGENS[motivo])
             return
 
-    # 2. Enviar mensagem de processamento
-    await whatsapp_service.enviar_mensagem(telefone, "📷 Analisando imagem...")
+    # 2. Processar imagem
 
     try:
-        # 2. Processar imagem
         resultado = await image_reader_service.processar_imagem(message)
 
         if resultado["sucesso"] and resultado["chave"]:

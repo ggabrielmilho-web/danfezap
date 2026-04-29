@@ -547,21 +547,12 @@ class MensagemHandler:
                 xml_filename
             )
 
-        # Enviar mensagem de sucesso
-        await whatsapp_service.enviar_mensagem(telefone, MENSAGENS["sucesso"])
-
         # Enviar por email se cadastrado
         if usuario.email:
-            emails_para_enviar = [usuario.email]
-        else:
-            emails_para_enviar = []
-
-        if emails_para_enviar:
-            # Já tem email cadastrado → enviar automaticamente
             from app.services.email_service import email_service
 
             resultado_email = await email_service.enviar_danfe(
-                emails=emails_para_enviar,
+                emails=[usuario.email],
                 chave_nfe=chave_limpa,
                 pdf_bytes=pdf_bytes,
                 xml_bytes=xml_bytes
@@ -570,7 +561,7 @@ class MensagemHandler:
             if resultado_email["sucesso"]:
                 await whatsapp_service.enviar_mensagem(
                     telefone,
-                    MENSAGENS["email_enviado_automatico"]
+                    "📧 Enviei pro seu email também!"
                 )
             else:
                 await whatsapp_service.enviar_mensagem(
