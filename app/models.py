@@ -43,6 +43,11 @@ class Usuario(Base):
     plano = Column(String(10), nullable=True)              # "basico" | "pro"
     aguardando_escolha_plano = Column(Boolean, default=False)
 
+    # Controle de follow-up — evita envio duplicado
+    followup_1_enviado = Column(Boolean, default=False)   # ativação (2h)
+    followup_2_enviado = Column(Boolean, default=False)   # reforço (24h)
+    followup_3_enviado = Column(Boolean, default=False)   # recuperação (72h)
+
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 

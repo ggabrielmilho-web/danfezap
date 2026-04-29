@@ -72,4 +72,19 @@ def migrate_db():
                 "ALTER TABLE pagamentos ADD COLUMN IF NOT EXISTS plano VARCHAR(10)"
             )
         )
+        conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS followup_1_enviado BOOLEAN DEFAULT FALSE"
+            )
+        )
+        conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS followup_2_enviado BOOLEAN DEFAULT FALSE"
+            )
+        )
+        conn.execute(
+            __import__("sqlalchemy").text(
+                "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS followup_3_enviado BOOLEAN DEFAULT FALSE"
+            )
+        )
         conn.commit()
