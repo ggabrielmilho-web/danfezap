@@ -296,6 +296,9 @@ async def webhook_mercadopago(request: Request, db: Session = Depends(get_db)):
         usuario.data_expiracao = datetime.now() + timedelta(days=config.DIAS_ASSINATURA)
         usuario.ativo = True
 
+        # Limpa flag de escolha de plano — pagamento confirma o plano
+        usuario.aguardando_escolha_plano = False
+
         # Salvar no banco
         db.commit()
 
