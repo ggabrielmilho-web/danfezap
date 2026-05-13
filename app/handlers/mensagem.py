@@ -70,7 +70,7 @@ Aguarda uns 5-10 minutos e tenta de novo.
         "Pra continuar usando 👇\n\n"
         "💼 *1 — Básico* R$14,90 (100 consultas/mês)\n"
         "⚡ *2 — Profissional* R$49 (Ilimitado)\n\n"
-        "👉 Recomendado pra quem usa com frequência\n\n"
+        "💸 Pagamento simples via Pix — sem cartão, sem assinatura recorrente\n\n"
         "Qual você quer liberar? Responde *1* ou *2*"
     ),
 
