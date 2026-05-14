@@ -198,7 +198,9 @@ Events: payment
      - Extrai chave automaticamente e valida
    - Bot valida estrutura localmente (Módulo 11)
    - Consulta DANFE: **MeuDanfe (primário)** → se falhar → **ConsultaDanfe (fallback gratuito)**
-   - Envia PDF do DANFE e XML da NFe de volta
+   - Envia PDF do DANFE e XML da NFe via WhatsApp
+   - **Se tiver email cadastrado:** envia PDF + XML por email automaticamente também
+   - **Se não tiver email:** pergunta se quer cadastrar (só na primeira consulta)
    - **Importante:** Apenas consultas bem-sucedidas consomem o contador (erros não contam!)
    - Após 2 consultas, precisa assinar
 
@@ -223,6 +225,7 @@ Events: payment
 - **status** - Ver consultas usadas/disponíveis e dias restantes
 - **ajuda** - Ver instruções de uso
 - **assinar** - Gerar Pix para assinar/renovar
+- **email** - Cadastrar, ver ou alterar email para receber DANFE automaticamente
 - **<chave_44_digitos>** - Consultar DANFE (digitando)
 - **<foto_danfe>** - Enviar foto do DANFE (extração automática)
 
@@ -241,6 +244,13 @@ Events: payment
 **Assinante Pro:**
 - Consultas ilimitadas
 - Válida por 30 dias
+
+### Envio por Email
+
+Após uma consulta bem-sucedida:
+- **Com email cadastrado:** envia PDF + XML por email automaticamente via Resend API + confirma no WhatsApp ("📧 Enviei pro seu email também!")
+- **Sem email cadastrado:** pergunta se quer cadastrar ("📩 Se quiser receber automaticamente no email também, me manda seu email aqui")
+- O usuário pode digitar o email, responder "não" pra pular, ou usar o comando `email` a qualquer momento pra ver/alterar
 
 ### Consulta de DANFE com Fallback
 
