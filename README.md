@@ -8,7 +8,7 @@ Bot de WhatsApp em Python para motoristas autônomos consultarem DANFE (document
 - **Framework:** FastAPI
 - **Banco de dados:** PostgreSQL 15
 - **WhatsApp:** Evolution API v2.3.7+
-- **Consulta DANFE:** API MeuDanfe (https://api.meudanfe.com.br/v2)
+- **Consulta DANFE:** API MeuDanfe (https://api.meudanfe.com.br/v2) + ConsultaDanfe (https://consultadanfe.com) como fallback gratuito
 - **Pagamento:** Mercado Pago (Pix)
 - **Processamento de imagem:** pyzbar (grátis) + Google Vision API (fallback)
 - **Containerização:** Docker + Docker Compose
@@ -92,6 +92,9 @@ MERCADOPAGO_WEBHOOK_SECRET=seu_webhook_secret
 
 # MeuDanfe API
 API_KEY=sua_api_key_meudanfe
+
+# ConsultaDanfe (fallback gratuito quando MeuDanfe falha; false desativa)
+CONSULTADANFE_FALLBACK_ATIVO=true
 
 # Google Vision API (opcional - usado como fallback para ler imagens)
 GOOGLE_VISION_API_KEY=sua_api_key_aqui

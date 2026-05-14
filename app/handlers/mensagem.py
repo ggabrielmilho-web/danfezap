@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from ..models import Usuario, Consulta, Pagamento
 from ..services.validador import validar_chave_nfe, extrair_info_chave
-from ..services.danfe import danfe_service
+from ..services.danfe import danfe_service, consultar_com_fallback
 from ..services.whatsapp import whatsapp_service
 from ..services.pagamento import pagamento_service
 from ..config import config
@@ -492,8 +492,8 @@ class MensagemHandler:
         # Enviar mensagem de processamento
         await whatsapp_service.enviar_mensagem(telefone, MENSAGENS["processando"])
 
-        # Consultar DANFE
-        resultado_danfe = await danfe_service.consultar_com_retry(chave_limpa, max_tentativas=2)
+        # Consultar DANFE (MeuDanfe primário + ConsultaDanfe fallback)
+        resultado_danfe = await consultar_com_fallback(chave_limpa)
 
         if not resultado_danfe["sucesso"]:
             # Registrar consulta com erro

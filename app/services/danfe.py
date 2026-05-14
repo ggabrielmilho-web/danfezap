@@ -227,3 +227,40 @@ class DanfeService:
 
 # Instância global do serviço
 danfe_service = DanfeService()
+
+
+async def consultar_com_fallback(chave: str) -> dict:
+    """
+    Orquestra MeuDanfe (primário) + ConsultaDanfe (fallback gratuito).
+
+    1) Tenta MeuDanfe com retries (comportamento atual).
+    2) Se MeuDanfe falhar e o fallback estiver ativo, tenta ConsultaDanfe.
+    3) Se ConsultaDanfe salvar, retorna o resultado dele.
+    4) Se ambos falharem, retorna o erro do MeuDanfe enriquecido com o
+       erro do fallback no campo "erro" (pra ficar visível no log).
+
+    Tudo do fallback fica em try/except: bug no ConsultaDanfe não pode
+    quebrar o fluxo — pior caso voltamos ao erro original do MeuDanfe.
+    """
+    resultado = await danfe_service.consultar_com_retry(chave, max_tentativas=2)
+
+    if resultado["sucesso"]:
+        return resultado
+
+    if not config.CONSULTADANFE_FALLBACK_ATIVO:
+        return resultado
+
+    try:
+        from .consultadanfe import consultadanfe_service
+        resultado_fb = await consultadanfe_service.consultar(chave)
+
+        if resultado_fb["sucesso"]:
+            print(f"✓ Fallback ConsultaDanfe SALVOU consulta {chave[-8:]}")
+            return resultado_fb
+
+        resultado["erro"] = f"{resultado['erro']} | Fallback ConsultaDanfe: {resultado_fb['erro']}"
+        return resultado
+
+    except Exception as e:
+        print(f"⚠ Erro inesperado no fallback ConsultaDanfe (ignorado): {e}")
+        return resultado
