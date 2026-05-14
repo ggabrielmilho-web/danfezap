@@ -7,11 +7,11 @@ Bot de WhatsApp em Python para motoristas autônomos consultarem DANFE (document
 - **Linguagem:** Python 3.11+
 - **Framework:** FastAPI
 - **Banco de dados:** PostgreSQL 15
-- **WhatsApp:** Evolution API v2.3.7+
-- **Consulta DANFE:** API MeuDanfe (https://api.meudanfe.com.br/v2) + ConsultaDanfe (https://consultadanfe.com) como fallback gratuito
+- **WhatsApp:** UazAPI
+- **Consulta DANFE:** API MeuDanfe (primário) + ConsultaDanfe (fallback gratuito)
 - **Pagamento:** Mercado Pago (Pix)
 - **Processamento de imagem:** pyzbar (grátis) + Google Vision API (fallback)
-- **Containerização:** Docker + Docker Compose
+- **Containerização:** Docker + Docker Compose (Swarm em produção)
 
 ## 📁 Estrutura do Projeto
 
@@ -25,8 +25,9 @@ danfezap/
 │   ├── models.py            # SQLAlchemy models
 │   ├── services/
 │   │   ├── __init__.py
-│   │   ├── whatsapp.py      # Evolution API (enviar mensagens/PDF/XML)
-│   │   ├── danfe.py         # Consulta API MeuDanfe (PDF e XML)
+│   │   ├── whatsapp.py      # UazAPI (enviar mensagens/PDF/XML)
+│   │   ├── danfe.py         # MeuDanfe + orquestrador de fallback
+│   │   ├── consultadanfe.py # ConsultaDanfe (fallback gratuito)
 │   │   ├── pagamento.py     # Mercado Pago Pix
 │   │   ├── validador.py     # Validação chave NFe
 │   │   └── image_reader.py  # Extração de chaves de imagens (pyzbar + Google Vision)
@@ -81,29 +82,43 @@ Edite o arquivo `.env` com suas credenciais:
 # Banco de dados
 DATABASE_URL=postgresql://botdanfe:senha_segura@localhost:5432/danfezap
 
-# Evolution API
-EVOLUTION_URL=https://api.carvalhoia.com
-EVOLUTION_APIKEY=sua_api_key
-EVOLUTION_INSTANCE=danfezap
+# UazAPI (WhatsApp)
+UAZAPI_URL=https://sua-instancia.uazapi.com
+UAZAPI_TOKEN=seu_token
+
+# URL base para webhooks
+WEBHOOK_BASE_URL=https://seu-dominio.com
 
 # Mercado Pago
 MERCADOPAGO_ACCESS_TOKEN=seu_access_token
 MERCADOPAGO_WEBHOOK_SECRET=seu_webhook_secret
 
-# MeuDanfe API
+# MeuDanfe API (primário)
 API_KEY=sua_api_key_meudanfe
 
 # ConsultaDanfe (fallback gratuito quando MeuDanfe falha; false desativa)
 CONSULTADANFE_FALLBACK_ATIVO=true
 
-# Google Vision API (opcional - usado como fallback para ler imagens)
+# Google Vision API (opcional - fallback para leitura de imagens de baixa qualidade)
 GOOGLE_VISION_API_KEY=sua_api_key_aqui
 
 # App
 VALOR_ASSINATURA=14.90
 DIAS_ASSINATURA=30
-CONSULTAS_GRATIS=5
+CONSULTAS_GRATIS=2
 LIMITE_CONSULTAS_MES=100
+
+# Planos
+VALOR_PLANO_BASICO=14.90
+VALOR_PLANO_PRO=49.00
+LIMITE_PLANO_BASICO=100
+LIMITE_PLANO_PRO=1000
+
+# Admin (kill switch do bot)
+ADMIN_TOKEN=seu_token_secreto
+
+# Follow-up automático
+FOLLOWUP_ATIVO=true
 ```
 
 **Como obter a Google Vision API Key:**
@@ -142,19 +157,18 @@ Resposta esperada:
 ```json
 {
   "status": "online",
-  "app": "Bot DANFE WhatsApp",
-  "version": "1.0.0"
+  "app": "Bot DANFE WhatsApp"
 }
 ```
 
 ## 🔧 Configurar Webhooks
 
-### Evolution API
+### UazAPI
 
-Configure o webhook no painel da Evolution API:
+Configure o webhook no painel da UazAPI:
 
 ```
-URL: https://danfezap.carvalhoia.com/webhook/evolution
+URL: https://seu-dominio.com/webhook/uazapi
 Events: messages.upsert
 ```
 
@@ -163,11 +177,9 @@ Events: messages.upsert
 Configure o webhook no painel do Mercado Pago:
 
 ```
-URL: https://danfezap.carvalhoia.com/webhook/mercadopago
+URL: https://seu-dominio.com/webhook/mercadopago
 Events: payment
 ```
-
-**Importante:** A variável `WEBHOOK_BASE_URL` no arquivo `.env` deve apontar para o domínio onde sua aplicação está rodando (ex: https://danfezap.carvalhoia.com). Esta URL é usada automaticamente pelo sistema para configurar os webhooks do Mercado Pago.
 
 ## 📱 Como Funciona
 
@@ -175,7 +187,7 @@ Events: payment
 
 1. **Primeiro contato**
    - Usuário envia mensagem no WhatsApp
-   - Bot registra e dá **5 consultas grátis**
+   - Bot registra e dá **2 consultas grátis**
    - Envia mensagem de boas-vindas
 
 2. **Consulta de DANFE (Usuário Gratuito)**
@@ -185,22 +197,26 @@ Events: payment
      - Se falhar, usa Google Vision API como fallback
      - Extrai chave automaticamente e valida
    - Bot valida estrutura localmente (Módulo 11)
-   - Consulta DANFE na API MeuDanfe
+   - Consulta DANFE: **MeuDanfe (primário)** → se falhar → **ConsultaDanfe (fallback gratuito)**
    - Envia PDF do DANFE e XML da NFe de volta
    - **Importante:** Apenas consultas bem-sucedidas consomem o contador (erros não contam!)
-   - Após 5 consultas, precisa assinar
+   - Após 2 consultas, precisa assinar
 
 3. **Assinatura Mensal**
-   - Valor: R$ 14,90/mês
-   - Libera **100 consultas por mês**
+
+   | Plano | Valor | Consultas |
+   |-------|-------|-----------|
+   | Básico | R$ 14,90/mês | 100 consultas |
+   | Pro | R$ 49,00/mês | Ilimitado |
+
    - Contador reseta a cada pagamento
    - Válida por 30 dias
 
 4. **Renovação da assinatura**
-   - Bot gera Pix de R$ 14,90
+   - Bot gera Pix via Mercado Pago
    - Usuário paga via Pix
-   - Webhook confirma pagamento
-   - Assinatura ativa por 30 dias + 100 consultas disponíveis
+   - Webhook confirma pagamento automaticamente
+   - Assinatura ativa por mais 30 dias
 
 ### Comandos
 
@@ -213,14 +229,27 @@ Events: payment
 ### Sistema de Consultas
 
 **Usuário Gratuito:**
-- 5 consultas grátis
+- 2 consultas grátis
 - Apenas consultas bem-sucedidas contam
 - Erros não descontam do limite
 
-**Assinante:**
+**Assinante Básico:**
 - 100 consultas por mês
 - Contador reseta a cada pagamento (não por mês calendário)
 - Válida por 30 dias
+
+**Assinante Pro:**
+- Consultas ilimitadas
+- Válida por 30 dias
+
+### Consulta de DANFE com Fallback
+
+O bot usa duas fontes de DANFE com fallback automático:
+
+1. **MeuDanfe (primário):** Sempre consultado primeiro. Cobre todos os tipos (NF-e, CT-e) e qualquer data.
+2. **ConsultaDanfe (fallback gratuito):** Acionado automaticamente quando o MeuDanfe falha. Cobre NF-e do mês atual e do mês anterior (se antes do dia 15). O motorista não percebe a troca — recebe PDF e XML normalmente.
+
+Para desativar o fallback: `CONSULTADANFE_FALLBACK_ATIVO=false` no `.env`.
 
 ## 📷 Processamento de Imagens
 
@@ -246,21 +275,11 @@ O bot aceita **fotos do DANFE** para extrair a chave automaticamente, facilitand
    - ✅ Chave encontrada → processa como se fosse digitada
    - ❌ Chave não encontrada → pede foto melhor ou digitar manualmente
 
-### Dependências
-
-O processamento de imagens usa as seguintes bibliotecas (já no `requirements.txt`):
-
-```txt
-pyzbar==0.1.9                    # Leitura de código de barras/QR Code (grátis)
-opencv-python-headless==4.8.1.78 # Processamento de imagem
-Pillow==10.1.0                   # Manipulação de imagem
-```
-
 ### Estratégia de Custo
 
 - **90%+ das imagens:** Processadas com pyzbar (gratuito)
 - **10% restante:** Fallback para Google Vision (pago)
-- **Custo estimado:** $0.15 por 1000 consultas com imagem (se 10% usarem Google Vision)
+- **Custo estimado:** $0.15 por 1000 consultas com imagem
 
 ### Tipos de Imagem Suportados
 
@@ -276,11 +295,6 @@ Pillow==10.1.0                   # Manipulação de imagem
 - Código de barras danificado
 - Imagem muito pequena (baixa resolução)
 
-**Dica:** Se o bot não conseguir ler, ele pede para:
-- Tirar foto mais clara
-- Focar no código de barras/QR Code
-- Ou digitar os 44 números manualmente
-
 ## 🌐 Endpoints da API
 
 ### GET /
@@ -290,17 +304,19 @@ Health check da aplicação
 Status de saúde do serviço
 
 ### GET /stats
-Estatísticas do bot:
-- Total de usuários
-- Usuários ativos
-- Total de consultas
-- Taxa de sucesso
+Estatísticas do bot (total usuários, consultas, taxa de sucesso)
 
-### POST /webhook/evolution
+### POST /webhook/uazapi
 Recebe mensagens do WhatsApp
 
 ### POST /webhook/mercadopago
 Recebe confirmações de pagamento
+
+### POST /admin/bot/on e /admin/bot/off
+Kill switch do bot (requer ADMIN_TOKEN)
+
+### GET /admin/bot/status
+Status atual do bot
 
 ## 🧪 Desenvolvimento Local
 
@@ -322,107 +338,88 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ### Acessar documentação automática
 
-FastAPI gera documentação automática:
-
 - Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
 
-## 📊 Monitoramento
+## 📊 Monitoramento (Produção)
 
 ### Ver logs em tempo real
 
 ```bash
-# Logs da aplicação
-docker logs -f danfezap-app
-
-# Logs do PostgreSQL
-docker logs -f danfezap-postgres
+docker service logs -f danfezap_danfezap-api
 ```
 
-### Parar containers
+### Filtrar logs relevantes
 
 ```bash
-docker-compose down
+docker service logs -f danfezap_danfezap-api 2>&1 | grep -iE "ConsultaDanfe|Fallback|ERROR"
 ```
 
-### Parar e remover volumes (limpar banco)
+### Verificar fallback em ação
 
-```bash
-docker-compose down -v
-```
+Procurar nos logs por:
+- `✓ Fallback ConsultaDanfe SALVOU consulta XXXXXXXX` — fallback acionado com sucesso
+- `⚠ Erro inesperado no fallback ConsultaDanfe` — bug no fallback (não derruba o fluxo)
 
 ## 🔒 Segurança
 
 - Nunca commite o arquivo `.env` (já está no .gitignore)
-- Nunca commite `GOOGLE_VISION_API_KEY` ou outras credenciais sensíveis
-- Use HTTPS em produção (nginx + certbot)
+- Use HTTPS em produção
 - Configure firewall para expor apenas as portas necessárias
 - Valide webhook signatures do Mercado Pago em produção
-
-**Sobre Google Vision API:**
-- A chave é **opcional** - o bot funciona apenas com pyzbar (gratuito)
-- Se não configurar, apenas pula o fallback para Google Vision
-- Recomendado ter para melhor taxa de sucesso em imagens ruins
+- Kill switch disponível via `/admin/bot/off` com ADMIN_TOKEN
 
 ## 🐛 Troubleshooting
 
 ### Container não inicia
 
 ```bash
-# Ver logs completos
-docker logs danfezap-app
-
-# Reconstruir container
-docker-compose up -d --build --force-recreate
+docker service logs danfezap_danfezap-api
 ```
-
-### Erro de conexão com banco
-
-- Verifique se o PostgreSQL está rodando: `docker ps`
-- Verifique DATABASE_URL no .env
-- Aguarde alguns segundos para o PostgreSQL iniciar completamente
 
 ### Webhook não recebe mensagens
 
 - Verifique se a URL está acessível publicamente
-- Use ngrok para testes locais: `ngrok http 8000`
-- Configure a URL do webhook na Evolution API
+- Confirme que o webhook está configurado na UazAPI apontando para `/webhook/uazapi`
 
 ### Bot não consegue ler imagens
 
-- Verifique se as dependências de imagem estão instaladas: `pyzbar`, `opencv-python-headless`, `Pillow`
-- No Docker, reconstrua a imagem: `docker-compose up -d --build`
-- Teste se o pyzbar está funcionando: veja logs em `docker logs danfezap-app`
-- Verifique se `GOOGLE_VISION_API_KEY` está configurada (opcional, mas melhora taxa de sucesso)
-- Se o erro persistir, peça ao usuário para digitar a chave manualmente
+- Verifique se `pyzbar`, `opencv-python-headless` e `Pillow` estão no requirements
+- Reconstrua a imagem Docker após mudanças nas dependências
+- `GOOGLE_VISION_API_KEY` é opcional mas melhora taxa de sucesso em imagens ruins
+
+### MeuDanfe não encontra a nota
+
+- O fallback ConsultaDanfe é acionado automaticamente
+- Se ambos falharem, verifique `ultimo_erro` na tabela `consultas`
+- Para notas muito antigas (mais de 2 meses), apenas o MeuDanfe cobre
 
 ## 📝 Licença
 
 Projeto desenvolvido para uso comercial.
 
-## 👨‍💻 Autor
-
-Bot DANFE WhatsApp - Sistema de consulta de notas fiscais
-
 ---
 
-**Versão:** 2.1.0
-**Última atualização:** Janeiro 2026
+**Versão:** 2.2.0
+**Última atualização:** Maio 2026
 
 ## 📋 Changelog
+
+### v2.2.0 (Maio 2026)
+- ✅ **Fallback ConsultaDanfe:** Quando MeuDanfe falha, tenta ConsultaDanfe automaticamente (gratuito)
+- ✅ Consultas grátis reduzidas de 5 para 2
+- ✅ Plano Pro adicionado: R$ 49/mês ilimitado
+- ✅ Migração de Evolution API para UazAPI
 
 ### v2.1.0 (Janeiro 2026)
 - ✅ **Processamento de imagens:** Usuários podem enviar foto do DANFE
 - ✅ Extração automática de chave NFe via pyzbar (gratuito)
 - ✅ Google Vision API como fallback para imagens de baixa qualidade
 - ✅ Validação automática com Módulo 11
-- ✅ Mensagens de feedback para usuário durante processamento
 
 ### v2.0.0 (Dezembro 2025)
-- ✅ Migração de "7 dias grátis" para "5 consultas grátis"
+- ✅ Migração de "7 dias grátis" para sistema de consultas grátis
 - ✅ Sistema de limite mensal: 100 consultas para assinantes
 - ✅ Contador reseta a cada pagamento (não por mês calendário)
 - ✅ Apenas consultas bem-sucedidas consomem o contador
 - ✅ Comando "assinar" para gerar Pix
-- ✅ Idempotência no webhook de pagamento
-- ✅ Novos campos no banco: `consultas_gratis`, `assinante`, `consultas_mes`, `limite_consultas`
