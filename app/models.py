@@ -61,7 +61,8 @@ class Usuario(Base):
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Relacionamentos
-    consultas = relationship("Consulta", back_populates="usuario")
+    # foreign_keys explícito: consultas tem 2 FKs pra usuarios (usuario_id + master_id)
+    consultas = relationship("Consulta", back_populates="usuario", foreign_keys="Consulta.usuario_id")
     pagamentos = relationship("Pagamento", back_populates="usuario")
 
     def __repr__(self):
