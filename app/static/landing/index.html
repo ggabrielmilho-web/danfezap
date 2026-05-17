@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="DanfeZap - DANFE em PDF e XML no WhatsApp em 10 segundos. Manda a chave, recebe a nota." />
+  <title>DanfeZap — DANFE no WhatsApp em 10 segundos</title>
+  <link rel="stylesheet" href="/static/landing/style.css" />
+</head>
+<body>
+
+<header class="topo">
+  <div class="wrap topo__wrap">
+    <a href="/" class="logo">Danfe<span>Zap</span></a>
+    <nav class="topo__nav">
+      <a href="#planos">Planos</a>
+      <a href="#faq">Dúvidas</a>
+      <a href="/painel" class="topo__login">Entrar no painel</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap hero__wrap">
+    <h1>Sua DANFE no WhatsApp em <strong>10 segundos</strong>.</h1>
+    <p class="hero__sub">
+      Mandou a chave de 44 dígitos, recebeu o PDF e o XML. Sem login, sem cadastro,
+      sem instalar nada. Funciona em qualquer celular.
+    </p>
+    <div class="hero__ctas">
+      <a class="btn btn--primario js-cta-bot" href="#" rel="noopener">
+        Começar grátis no WhatsApp
+      </a>
+      <a class="btn btn--linha" href="#planos">Ver planos</a>
+    </div>
+    <p class="hero__bonus">2 consultas grátis pra testar. Sem cartão.</p>
+  </div>
+</section>
+
+<section class="como">
+  <div class="wrap">
+    <h2>Como funciona</h2>
+    <ol class="como__passos">
+      <li>
+        <span class="como__num">1</span>
+        <h3>Manda a chave</h3>
+        <p>Os 44 dígitos da nota, ou uma foto do DANFE com o código de barras.</p>
+      </li>
+      <li>
+        <span class="como__num">2</span>
+        <h3>A gente busca</h3>
+        <p>Consulta na fonte oficial e devolve o PDF + XML pra você no Zap.</p>
+      </li>
+      <li>
+        <span class="como__num">3</span>
+        <h3>Pronto</h3>
+        <p>Encaminha pro cliente, arquiva ou imprime. Histórico fica salvo no seu painel.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section id="planos" class="planos">
+  <div class="wrap">
+    <h2>Escolha seu plano</h2>
+    <p class="planos__intro">Comece grátis. Mude quando precisar.</p>
+
+    <div class="planos__grid">
+
+      <article class="plano">
+        <h3 class="plano__nome">Básico</h3>
+        <p class="plano__preco"><strong>R$ 14,90</strong><span>/mês</span></p>
+        <p class="plano__alvo">Pra quem consulta de vez em quando.</p>
+        <ul class="plano__lista">
+          <li>100 consultas por mês</li>
+          <li>PDF e XML no WhatsApp</li>
+          <li>Envio automático por email</li>
+          <li>Pagamento via Pix</li>
+        </ul>
+        <a class="btn btn--linha js-cta-bot" href="#">Assinar Básico</a>
+      </article>
+
+      <article class="plano plano--destaque">
+        <span class="plano__tag">Mais popular</span>
+        <h3 class="plano__nome">Pro</h3>
+        <p class="plano__preco"><strong>R$ 49</strong><span>/mês</span></p>
+        <p class="plano__alvo">Pra motorista profissional que roda toda semana.</p>
+        <ul class="plano__lista">
+          <li><strong>Consultas ilimitadas</strong></li>
+          <li>PDF e XML no WhatsApp e email</li>
+          <li>Painel web com histórico</li>
+          <li>Re-download grátis quantas vezes precisar</li>
+          <li>Exportar histórico em CSV</li>
+        </ul>
+        <a class="btn btn--primario js-cta-bot" href="#">Assinar Pro</a>
+      </article>
+
+      <article class="plano">
+        <h3 class="plano__nome">Escritório</h3>
+        <p class="plano__preco">
+          <strong>R$ 99</strong><span>/mês</span>
+          <small class="plano__antigo">R$ 199 depois do lançamento</small>
+        </p>
+        <p class="plano__alvo">Pra contador que cuida de vários clientes.</p>
+        <ul class="plano__lista">
+          <li>Até <strong>20 clientes</strong> cadastrados</li>
+          <li>1.000 consultas/mês compartilhadas</li>
+          <li>Sincronização automática com Google Drive</li>
+          <li>Painel com filtros por cliente, CNPJ e período</li>
+          <li>3 administradores extras</li>
+          <li>Cobrança recorrente via cartão</li>
+        </ul>
+        <button class="btn btn--linha" disabled>Em breve</button>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<section id="faq" class="faq">
+  <div class="wrap">
+    <h2>Perguntas frequentes</h2>
+
+    <details class="faq__item">
+      <summary>Como o bot consegue as notas?</summary>
+      <p>
+        A gente consulta o serviço da MeuDanfe usando a chave de 44 dígitos que
+        você manda. Quando a MeuDanfe não tem registro, tentamos um fallback gratuito.
+        Você recebe o PDF e o XML originais no WhatsApp.
+      </p>
+    </details>
+
+    <details class="faq__item">
+      <summary>Preciso passar dados de acesso da Sefaz ou certificado digital?</summary>
+      <p>
+        Não. Você só precisa da chave da NF-e (os 44 dígitos), que vem impressa na
+        DANFE ou no XML. Nada de senha de portal, e-CNPJ ou certificado.
+      </p>
+    </details>
+
+    <details class="faq__item">
+      <summary>E se a nota não tiver registro?</summary>
+      <p>
+        Acontece com NF-e muito antiga ou recém-emitida. O bot avisa direto no Zap,
+        e a consulta não conta no seu limite. Você pode tentar de novo mais tarde.
+      </p>
+    </details>
+
+    <details class="faq__item">
+      <summary>Posso cancelar quando quiser?</summary>
+      <p>
+        Sim. Não tem fidelidade. O Básico e o Pro são pagos via Pix mensal — se
+        não renovar, a assinatura simplesmente vence. O Escritório é cartão recorrente
+        e você cancela pelo próprio painel.
+      </p>
+    </details>
+
+    <details class="faq__item">
+      <summary>Como o plano Escritório ajuda um contador?</summary>
+      <p>
+        Você cadastra os WhatsApps dos seus clientes uma vez. Cada cliente consulta
+        sozinho, e os PDFs/XMLs caem automaticamente numa pasta do seu Google Drive,
+        organizados por mês e por cliente. Você vê tudo num painel único, exporta CSV
+        e nunca mais corre atrás de nota.
+      </p>
+    </details>
+
+    <details class="faq__item">
+      <summary>O que vem só na DANFE e o que vem no XML?</summary>
+      <p>
+        A DANFE é o PDF “bonito” pra imprimir e mostrar pro motorista ou pro cliente.
+        O XML é o arquivo oficial que o contador precisa pra escriturar. A gente
+        sempre manda os dois.
+      </p>
+    </details>
+  </div>
+</section>
+
+<footer class="rodape">
+  <div class="wrap rodape__wrap">
+    <div>
+      <p class="rodape__marca">Danfe<span>Zap</span></p>
+      <p class="rodape__copy">DANFE e XML no WhatsApp em 10 segundos.</p>
+    </div>
+    <div>
+      <a class="js-cta-bot" href="#">Falar no WhatsApp</a>
+      <a href="/painel">Entrar no painel</a>
+    </div>
+  </div>
+</footer>
+
+<script src="/static/landing/app.js"></script>
+</body>
+</html>

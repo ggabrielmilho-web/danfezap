@@ -40,13 +40,22 @@ class Usuario(Base):
     aguardando_email_secundario = Column(Boolean, default=False)
 
     # Plano de assinatura e estado de escolha
-    plano = Column(String(10), nullable=True)              # "basico" | "pro"
+    plano = Column(String(20), nullable=True)              # "basico" | "pro" | "escritorio"
     aguardando_escolha_plano = Column(Boolean, default=False)
 
     # Controle de follow-up — evita envio duplicado
     followup_1_enviado = Column(Boolean, default=False)   # ativação (2h)
     followup_2_enviado = Column(Boolean, default=False)   # reforço (24h)
     followup_3_enviado = Column(Boolean, default=False)   # recuperação (72h)
+
+    # Painel / Escritório (Fase 1 — schema, lógica nas fases seguintes)
+    tipo = Column(String(30), default="normal", index=True)   # normal | escritorio_dono | escritorio_admin | escritorio_cliente
+    master_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True, index=True)
+    nome_exibicao = Column(String(100), nullable=True)
+    link_drive = Column(String(500), nullable=True)
+    drive_folder_id = Column(String(100), nullable=True)
+    drive_ativo = Column(Boolean, default=False)
+    mp_preapproval_id = Column(String(100), nullable=True)
 
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
@@ -112,8 +121,12 @@ class Consulta(Base):
     ultimo_erro = Column(Text)
     created_at = Column(DateTime, default=func.now())
 
+    # Escritorio: aponta pro dono quando consulta vem de sub-cliente (NULL caso contrário)
+    master_id = Column(Integer, ForeignKey("usuarios.id"), nullable=True, index=True)
+    drive_sync = Column(Boolean, default=False)
+
     # Relacionamento
-    usuario = relationship("Usuario", back_populates="consultas")
+    usuario = relationship("Usuario", back_populates="consultas", foreign_keys=[usuario_id])
 
     def __repr__(self):
         return f"<Consulta(id={self.id}, chave_nfe={self.chave_nfe}, sucesso={self.sucesso})>"
@@ -132,7 +145,7 @@ class Pagamento(Base):
     data_pagamento = Column(DateTime)
     id_transacao_mp = Column(String(100))
     status = Column(String(20), default='pendente')  # pendente, aprovado, rejeitado
-    plano = Column(String(10), nullable=True)         # "basico" | "pro"
+    plano = Column(String(20), nullable=True)         # "basico" | "pro" | "escritorio"
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
@@ -141,3 +154,21 @@ class Pagamento(Base):
 
     def __repr__(self):
         return f"<Pagamento(id={self.id}, valor={self.valor}, status={self.status})>"
+
+
+class OtpCode(Base):
+    """
+    Códigos OTP para login no painel via WhatsApp.
+    Curto-prazo (TTL 5min), single-use.
+    """
+    __tablename__ = "otp_codes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    telefone = Column(String(20), nullable=False, index=True)
+    codigo = Column(String(6), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    used = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=func.now())
+
+    def __repr__(self):
+        return f"<OtpCode(telefone={self.telefone}, used={self.used})>"

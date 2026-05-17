@@ -4,6 +4,7 @@ Webhooks para Evolution API (WhatsApp) e Mercado Pago
 """
 from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 import logging
@@ -14,6 +15,7 @@ from .handlers.mensagem import processar_mensagem_recebida
 from .services.pagamento import pagamento_service
 from .services.image_reader import image_reader_service
 from .config import config
+from .routers import auth as auth_router
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -26,6 +28,9 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# Routers organizados (Fase 1: auth)
+app.include_router(auth_router.router)
+
 # Kill switch — flag em memória (True por padrão, reseta para True a cada restart)
 _bot_ativo: bool = True
 
@@ -34,6 +39,16 @@ _bot_ativo: bool = True
 async def startup_event():
     """Evento executado ao iniciar a aplicação"""
     logger.info("Iniciando Bot DANFE WhatsApp...")
+
+    # Fail-fast: JWT_SECRET precisa estar configurado antes do app servir requests
+    if not config.JWT_SECRET or len(config.JWT_SECRET) < 32:
+        raise RuntimeError(
+            "JWT_SECRET ausente ou curto demais (< 32 chars). "
+            "Gere com: python -c \"import secrets; print(secrets.token_urlsafe(64))\" "
+            "e configure no .env do servidor antes de subir."
+        )
+    if not config.BOT_WHATSAPP_NUMERO:
+        logger.warning("BOT_WHATSAPP_NUMERO vazio — CTA da landing fica sem destino.")
 
     # Criar tabelas no banco de dados
     try:
@@ -59,16 +74,6 @@ async def startup_event():
     logger.info("Aplicação iniciada!")
 
 
-@app.get("/")
-async def root():
-    """Endpoint raiz - verificação de saúde"""
-    return {
-        "status": "online",
-        "app": "Bot DANFE WhatsApp",
-        "version": "1.0.0"
-    }
-
-
 @app.get("/health")
 async def health_check():
     """Endpoint de health check"""
@@ -76,6 +81,21 @@ async def health_check():
         "status": "healthy",
         "timestamp": datetime.now().isoformat()
     }
+
+
+@app.get("/api/healthz")
+async def healthz():
+    """
+    Fallback explícito pra monitorings que batiam em GET / antes da landing.
+    Equivalente ao /health, mantido pra evitar quebrar UptimeRobot/Cloudflare/etc.
+    """
+    return {"status": "online", "app": "DanfeZap"}
+
+
+@app.get("/api/landing/config")
+async def landing_config():
+    """Config pública consumida pela landing estática (número do bot pro CTA)."""
+    return {"bot_numero": config.BOT_WHATSAPP_NUMERO}
 
 
 @app.post("/webhook/uazapi")
@@ -381,6 +401,15 @@ async def stats(db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Erro ao buscar estatísticas: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================
+# StaticFiles — DEVEM ser os últimos mounts.
+# `/static/...` serve assets (CSS/JS) e `/` serve a landing (html=True).
+# Rotas explícitas acima têm prioridade sobre o mount em "/".
+# ============================================================
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
+app.mount("/", StaticFiles(directory="app/static/landing", html=True), name="landing")
 
 
 if __name__ == "__main__":

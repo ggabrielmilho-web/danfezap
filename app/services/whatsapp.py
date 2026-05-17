@@ -7,6 +7,7 @@ import base64
 import logging
 from typing import Optional
 from ..config import config
+from ..utils.telefone import normalizar_telefone_br
 
 logger = logging.getLogger(__name__)
 
@@ -29,10 +30,7 @@ class WhatsAppService:
 
     def _formatar_numero(self, telefone: str) -> str:
         """Retorna número apenas com dígitos + código do Brasil"""
-        numero = ''.join(filter(str.isdigit, telefone))
-        if not numero.startswith('55'):
-            numero = '55' + numero
-        return numero
+        return normalizar_telefone_br(telefone)
 
     async def enviar_mensagem(self, telefone: str, texto: str) -> dict:
         try:

@@ -59,6 +59,17 @@ class Config:
     LIMITE_PLANO_BASICO = int(os.getenv("LIMITE_PLANO_BASICO", "100"))
     LIMITE_PLANO_PRO    = int(os.getenv("LIMITE_PLANO_PRO", "1000"))
 
+    # Auth painel (Fase 1)
+    # Default vazio: fail-fast no startup do main.py exige config explícita
+    JWT_SECRET = os.getenv("JWT_SECRET", "")
+    JWT_TTL_HORAS = int(os.getenv("JWT_TTL_HORAS", "24"))
+    OTP_TTL_SEGUNDOS = int(os.getenv("OTP_TTL_SEGUNDOS", "300"))
+    OTP_RATE_LIMIT_MAX = int(os.getenv("OTP_RATE_LIMIT_MAX", "3"))
+    OTP_RATE_LIMIT_JANELA_SEGUNDOS = int(os.getenv("OTP_RATE_LIMIT_JANELA_SEGUNDOS", "600"))
+
+    # Landing (Fase 1)
+    BOT_WHATSAPP_NUMERO = os.getenv("BOT_WHATSAPP_NUMERO", "")  # ex: "5511999999999"
+
     @classmethod
     def validar_config(cls):
         """Valida se as configurações essenciais estão definidas"""
