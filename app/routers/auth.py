@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-# Aceita formatos: 11999999999, 5511999999999, com ou sem máscara
-_REGEX_TEL_BR = re.compile(r"^\+?\d[\d\s\-\(\)]{8,20}$")
+# Aceita qualquer combinação de dígitos/máscara — valida pela contagem de dígitos.
+# Celular BR: 10 (sem 9 extra) ou 11 (com 9 extra) dígitos após DDD. Com DDI: 12 ou 13.
 
 
 class OtpSolicitarBody(BaseModel):
@@ -29,9 +29,12 @@ class OtpSolicitarBody(BaseModel):
     @field_validator("telefone")
     @classmethod
     def _valida_telefone(cls, v: str) -> str:
-        if not v or not _REGEX_TEL_BR.match(v.strip()):
-            raise ValueError("telefone inválido — use DDD + número (ex: 11999999999)")
-        return v.strip()
+        v = (v or "").strip()
+        digitos = re.sub(r"\D", "", v)
+        # Aceita: 10 ou 11 dígitos (sem DDI); 12 ou 13 (com DDI 55)
+        if len(digitos) not in (10, 11, 12, 13):
+            raise ValueError("telefone inválido — use DDD + número (ex: (11) 99999-9999)")
+        return v
 
 
 class OtpValidarBody(BaseModel):

@@ -36,9 +36,13 @@
             id="telefone"
             inputmode="numeric"
             autocomplete="tel"
-            placeholder="11999999999"
+            placeholder="(11) 99999-9999"
+            maxlength="16"
             required
           />
+          <small style="display:block; margin-top:6px; color: var(--cor-texto-suave); font-size:12px;">
+            Pode digitar com ou sem o 9 — a gente cuida.
+          </small>
         </div>
         <button type="submit" class="btn btn--primario btn--full" id="btn-enviar">
           Receber código
@@ -91,6 +95,31 @@
   const msg = document.getElementById('mensagem');
 
   let telefoneAtual = '';
+
+  /**
+   * Aplica máscara conforme o usuário digita.
+   * Formatos aceitos:
+   *   10 dígitos: (XX) XXXX-XXXX     (fixo ou celular sem o 9 extra)
+   *   11 dígitos: (XX) XXXXX-XXXX    (celular com o 9 extra)
+   */
+  function formatarTelefoneInput(valor) {
+    const d = valor.replace(/\D/g, '').slice(0, 11);
+    if (d.length === 0) return '';
+    if (d.length <= 2) return '(' + d;
+    if (d.length <= 6) return '(' + d.slice(0, 2) + ') ' + d.slice(2);
+    if (d.length <= 10) return '(' + d.slice(0, 2) + ') ' + d.slice(2, 6) + '-' + d.slice(6);
+    return '(' + d.slice(0, 2) + ') ' + d.slice(2, 7) + '-' + d.slice(7);
+  }
+
+  inputTelefone.addEventListener('input', (e) => {
+    const pos = e.target.selectionStart;
+    const antes = e.target.value;
+    const formatado = formatarTelefoneInput(antes);
+    e.target.value = formatado;
+    // Ajusta caret quando a máscara adiciona caracteres novos no final
+    const diff = formatado.length - antes.length;
+    try { e.target.setSelectionRange(pos + Math.max(diff, 0), pos + Math.max(diff, 0)); } catch {}
+  });
 
   function mostrarMensagem(texto, tipo) {
     msg.textContent = texto;
