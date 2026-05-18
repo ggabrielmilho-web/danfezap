@@ -3,7 +3,7 @@ App principal FastAPI
 Webhooks para Evolution API (WhatsApp) e Mercado Pago
 """
 from fastapi import FastAPI, Request, Depends, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
@@ -410,6 +410,15 @@ async def stats(db: Session = Depends(get_db)):
 # `/static/...` serve assets (CSS/JS) e `/` serve a landing (html=True).
 # Rotas explícitas acima têm prioridade sobre o mount em "/".
 # ============================================================
+
+# Mount StaticFiles exige trailing slash em sub-paths.
+# Redirect explícito pra /painel/ atende quem acessa /painel sem barra
+# (ex: link da landing, digitação manual).
+@app.get("/painel", include_in_schema=False)
+async def painel_redirect():
+    return RedirectResponse(url="/painel/", status_code=308)
+
+
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.mount("/painel", StaticFiles(directory="app/static/painel", html=True), name="painel")
 app.mount("/", StaticFiles(directory="app/static/landing", html=True), name="landing")
