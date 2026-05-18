@@ -16,6 +16,7 @@ from .services.pagamento import pagamento_service
 from .services.image_reader import image_reader_service
 from .config import config
 from .routers import auth as auth_router
+from .routers import painel as painel_router
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -28,8 +29,9 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Routers organizados (Fase 1: auth)
+# Routers organizados (Fase 1: auth, Fase 2: painel)
 app.include_router(auth_router.router)
+app.include_router(painel_router.router)
 
 # Kill switch — flag em memória (True por padrão, reseta para True a cada restart)
 _bot_ativo: bool = True
@@ -409,6 +411,7 @@ async def stats(db: Session = Depends(get_db)):
 # Rotas explícitas acima têm prioridade sobre o mount em "/".
 # ============================================================
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
+app.mount("/painel", StaticFiles(directory="app/static/painel", html=True), name="painel")
 app.mount("/", StaticFiles(directory="app/static/landing", html=True), name="landing")
 
 

@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DanfeZap — Painel</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%2325D366'/%3E%3Cpath d='M14 3 5 14h6l-1 7 9-12h-6l1-6Z' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/painel/style.css" />
+</head>
+<body>
+
+<header class="topo">
+  <div class="wrap topo__wrap">
+    <a href="/" class="logo">
+      <span class="logo__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="#fff"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg>
+      </span>
+      <span>Danfe<span class="logo__txt--accent">Zap</span></span>
+    </a>
+    <div class="topo__user">
+      <span id="saldo" class="saldo hidden"></span>
+      <span id="user-info"></span>
+      <button id="btn-sair" class="topo__sair">Sair</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+
+    <!-- Card de upsell (sem acesso ao painel) -->
+    <div id="card-upsell" class="card hidden">
+      <div class="upsell">
+        <h2>Painel exclusivo Pro</h2>
+        <p>Seu plano atual não inclui o painel web. Assine o <strong>Pro</strong> pelo WhatsApp e tenha acesso ao histórico de consultas, re-download de PDF/XML e exportação CSV.</p>
+        <a id="cta-upgrade" class="btn btn--primario" href="https://wa.me/5534988246138?text=Quero%20assinar%20o%20Pro" rel="noopener" target="_blank">
+          Assinar Pro no WhatsApp
+        </a>
+      </div>
+    </div>
+
+    <!-- Painel principal -->
+    <div id="painel-principal" class="hidden">
+
+      <div class="card">
+        <h2 class="card__titulo">Histórico de consultas</h2>
+
+        <div class="filtros">
+          <div class="form-group">
+            <label for="filtro-inicio">De</label>
+            <input type="date" id="filtro-inicio" />
+          </div>
+          <div class="form-group">
+            <label for="filtro-fim">Até</label>
+            <input type="date" id="filtro-fim" />
+          </div>
+          <div class="form-group">
+            <label for="filtro-status">Status</label>
+            <select id="filtro-status">
+              <option value="">Todas</option>
+              <option value="true">Sucesso</option>
+              <option value="false">Erro</option>
+            </select>
+          </div>
+          <div class="filtros__acoes">
+            <button id="btn-filtrar" class="btn btn--primario btn--sm">Filtrar</button>
+            <button id="btn-limpar" class="btn btn--secundario btn--sm">Limpar</button>
+            <button id="btn-csv" class="btn btn--secundario btn--sm">Exportar CSV</button>
+          </div>
+        </div>
+
+        <div id="mensagem-erro" class="mensagem mensagem--erro hidden"></div>
+
+        <div id="tabela-container">
+          <div class="empty">Carregando…</div>
+        </div>
+
+        <div id="paginacao" class="pag hidden">
+          <span id="pag-info"></span>
+          <div class="pag__nav">
+            <button id="btn-anterior" class="btn btn--secundario btn--sm">‹ Anterior</button>
+            <button id="btn-proxima" class="btn btn--secundario btn--sm">Próxima ›</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</main>
+
+<script src="/static/painel/app.js"></script>
+<script>
+  // Exige sessão — redireciona pro login se ausente
+  if (!exigirSessao()) { /* já redireciona */ }
+
+  const PAGE_SIZE = 50;
+
+  const elSaldo = document.getElementById('saldo');
+  const elUser = document.getElementById('user-info');
+  const elBtnSair = document.getElementById('btn-sair');
+  const elCardUpsell = document.getElementById('card-upsell');
+  const elPainel = document.getElementById('painel-principal');
+  const elCtaUpgrade = document.getElementById('cta-upgrade');
+
+  const elFiltroInicio = document.getElementById('filtro-inicio');
+  const elFiltroFim = document.getElementById('filtro-fim');
+  const elFiltroStatus = document.getElementById('filtro-status');
+  const elBtnFiltrar = document.getElementById('btn-filtrar');
+  const elBtnLimpar = document.getElementById('btn-limpar');
+  const elBtnCsv = document.getElementById('btn-csv');
+  const elTabela = document.getElementById('tabela-container');
+  const elMsgErro = document.getElementById('mensagem-erro');
+
+  const elPaginacao = document.getElementById('paginacao');
+  const elPagInfo = document.getElementById('pag-info');
+  const elBtnAnt = document.getElementById('btn-anterior');
+  const elBtnProx = document.getElementById('btn-proxima');
+
+  let offset = 0;
+  let totalAtual = 0;
+  let botNumero = '5534988246138';
+
+  elBtnSair.addEventListener('click', () => {
+    clearSession();
+    location.href = '/painel/';
+  });
+
+  function mostrarErro(texto) {
+    elMsgErro.textContent = texto;
+    elMsgErro.classList.remove('hidden');
+    setTimeout(() => elMsgErro.classList.add('hidden'), 5000);
+  }
+
+  function paramsAtuais() {
+    const p = new URLSearchParams();
+    if (elFiltroInicio.value) p.set('inicio', elFiltroInicio.value);
+    if (elFiltroFim.value) p.set('fim', elFiltroFim.value);
+    if (elFiltroStatus.value) p.set('sucesso', elFiltroStatus.value);
+    return p;
+  }
+
+  async function carregarMe() {
+    // Pega número do bot pra CTA de upgrade (best-effort)
+    fetch('/api/landing/config')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d && d.bot_numero) botNumero = d.bot_numero; })
+      .catch(() => {});
+
+    try {
+      const res = await apiFetch('/api/painel/me');
+      if (!res.ok) {
+        if (res.status === 401) return; // apiFetch já redireciona
+        throw new Error('falha ao carregar usuário');
+      }
+      const me = await res.json();
+
+      const nomeExibir = me.nome || me.telefone || 'Usuário';
+      elUser.innerHTML = `<strong>${escapeHtml(nomeExibir)}</strong>`;
+
+      if (!me.pode_acessar_painel) {
+        elCardUpsell.classList.remove('hidden');
+        elCtaUpgrade.href = `https://wa.me/${botNumero}?text=Quero%20assinar%20o%20Pro`;
+        return;
+      }
+
+      // Acesso liberado
+      if (me.consultas_disponiveis !== undefined && me.consultas_disponiveis !== null) {
+        elSaldo.innerHTML = `Consultas restantes: <strong>${me.consultas_disponiveis}</strong>`;
+        elSaldo.classList.remove('hidden');
+      }
+      elPainel.classList.remove('hidden');
+      await carregarConsultas();
+    } catch (err) {
+      mostrarErro('Erro ao carregar dados do usuário.');
+    }
+  }
+
+  async function carregarConsultas() {
+    elTabela.innerHTML = '<div class="empty">Carregando…</div>';
+    const p = paramsAtuais();
+    p.set('limit', PAGE_SIZE);
+    p.set('offset', offset);
+
+    try {
+      const res = await apiFetch('/api/painel/consultas?' + p.toString());
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        mostrarErro(j.detail || 'Falha ao listar consultas.');
+        elTabela.innerHTML = '<div class="empty">Erro ao carregar.</div>';
+        return;
+      }
+      const data = await res.json();
+      totalAtual = data.total;
+      renderTabela(data.items);
+      renderPaginacao(data);
+    } catch (err) {
+      mostrarErro('Erro de conexão.');
+    }
+  }
+
+  function renderTabela(items) {
+    if (!items || items.length === 0) {
+      elTabela.innerHTML = '<div class="empty">Nenhuma consulta encontrada. Mande uma chave no WhatsApp pra começar.</div>';
+      return;
+    }
+    const rows = items.map(c => {
+      const data = formatarData(c.data_consulta);
+      const chaveM = mascararChave(c.chave_nfe);
+      const status = c.sucesso
+        ? '<span class="badge badge--ok">Sucesso</span>'
+        : '<span class="badge badge--erro">Erro</span>';
+      const acoes = c.sucesso
+        ? `<div class="acoes-cel">
+             <button class="btn btn--secundario btn--sm" data-pdf="${c.id}">PDF</button>
+             <button class="btn btn--secundario btn--sm" data-xml="${c.id}">XML</button>
+           </div>`
+        : `<span style="color: var(--cor-texto-suave); font-size: 12px;">—</span>`;
+      return `<tr>
+        <td>${data}</td>
+        <td title="${escapeHtml(c.chave_nfe || '')}"><code>${escapeHtml(chaveM)}</code></td>
+        <td>${status}</td>
+        <td>${acoes}</td>
+      </tr>`;
+    }).join('');
+
+    elTabela.innerHTML = `
+      <div class="tabela-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Chave</th>
+              <th>Status</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `;
+
+    // Liga botões de download
+    elTabela.querySelectorAll('[data-pdf]').forEach(btn => {
+      btn.addEventListener('click', () => baixar(btn, 'pdf'));
+    });
+    elTabela.querySelectorAll('[data-xml]').forEach(btn => {
+      btn.addEventListener('click', () => baixar(btn, 'xml'));
+    });
+  }
+
+  async function baixar(btn, tipo) {
+    const id = btn.getAttribute(`data-${tipo}`);
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '…';
+    try {
+      const ext = tipo;
+      const prefix = tipo === 'pdf' ? 'DANFE' : 'NFE';
+      await downloadBlob(`/api/painel/consultas/${id}/${tipo}`, `${prefix}_${id}.${ext}`);
+    } catch (err) {
+      mostrarErro(err.message || `Falha ao baixar ${tipo.toUpperCase()}.`);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  }
+
+  function renderPaginacao(data) {
+    if (data.total <= PAGE_SIZE) {
+      elPaginacao.classList.add('hidden');
+      return;
+    }
+    elPaginacao.classList.remove('hidden');
+    const inicio = data.offset + 1;
+    const fim = Math.min(data.offset + data.items.length, data.total);
+    elPagInfo.textContent = `${inicio}–${fim} de ${data.total}`;
+    elBtnAnt.disabled = data.offset === 0;
+    elBtnProx.disabled = (data.offset + data.items.length) >= data.total;
+  }
+
+  elBtnAnt.addEventListener('click', () => {
+    offset = Math.max(0, offset - PAGE_SIZE);
+    carregarConsultas();
+  });
+  elBtnProx.addEventListener('click', () => {
+    offset = offset + PAGE_SIZE;
+    carregarConsultas();
+  });
+
+  elBtnFiltrar.addEventListener('click', () => {
+    offset = 0;
+    carregarConsultas();
+  });
+  elBtnLimpar.addEventListener('click', () => {
+    elFiltroInicio.value = '';
+    elFiltroFim.value = '';
+    elFiltroStatus.value = '';
+    offset = 0;
+    carregarConsultas();
+  });
+
+  elBtnCsv.addEventListener('click', async () => {
+    const p = paramsAtuais();
+    try {
+      elBtnCsv.disabled = true;
+      elBtnCsv.textContent = 'Exportando…';
+      const filename = `consultas_${new Date().toISOString().slice(0,10).replace(/-/g,'')}.csv`;
+      await downloadBlob('/api/painel/consultas/export.csv?' + p.toString(), filename);
+    } catch (err) {
+      mostrarErro(err.message || 'Falha ao exportar CSV.');
+    } finally {
+      elBtnCsv.disabled = false;
+      elBtnCsv.textContent = 'Exportar CSV';
+    }
+  });
+
+  function escapeHtml(s) {
+    if (s === null || s === undefined) return '';
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // Bootstrap
+  carregarMe();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,33 @@
+"""
+Geração de CSV das consultas do painel.
+
+Saída em UTF-8 com BOM (﻿) pra Excel abrir os acentos certos.
+Stdlib only — sem dependência nova.
+"""
+import csv
+import io
+from typing import Iterable
+
+from ..models import Consulta
+
+
+_COLUNAS = ["data_consulta", "chave_nfe", "sucesso", "tentativas", "ultimo_erro"]
+
+
+def gerar_csv_consultas(consultas: Iterable[Consulta]) -> bytes:
+    buffer = io.StringIO()
+    buffer.write("﻿")  # BOM pro Excel detectar UTF-8
+
+    writer = csv.writer(buffer, delimiter=",", quoting=csv.QUOTE_MINIMAL)
+    writer.writerow(_COLUNAS)
+
+    for c in consultas:
+        writer.writerow([
+            c.data_consulta.strftime("%Y-%m-%d %H:%M") if c.data_consulta else "",
+            c.chave_nfe or "",
+            "Sim" if c.sucesso else "Não",
+            c.tentativas if c.tentativas is not None else "",
+            (c.ultimo_erro or "").replace("\n", " ").replace("\r", " "),
+        ])
+
+    return buffer.getvalue().encode("utf-8")

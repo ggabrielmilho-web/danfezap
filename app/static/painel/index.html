@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DanfeZap — Entrar no painel</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%2325D366'/%3E%3Cpath d='M14 3 5 14h6l-1 7 9-12h-6l1-6Z' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/static/painel/style.css" />
+</head>
+<body>
+
+<header class="topo">
+  <div class="wrap topo__wrap">
+    <a href="/" class="logo">
+      <span class="logo__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="#fff"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"/></svg>
+      </span>
+      <span>Danfe<span class="logo__txt--accent">Zap</span></span>
+    </a>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <div class="card login">
+
+      <h1>Entrar no painel</h1>
+      <p class="sub">Login com WhatsApp. Você vai receber um código de 6 dígitos.</p>
+
+      <!-- Step 1: telefone -->
+      <form id="form-telefone">
+        <div class="form-group">
+          <label for="telefone">Seu WhatsApp (com DDD)</label>
+          <input
+            type="tel"
+            id="telefone"
+            inputmode="numeric"
+            autocomplete="tel"
+            placeholder="11999999999"
+            required
+          />
+        </div>
+        <button type="submit" class="btn btn--primario btn--full" id="btn-enviar">
+          Receber código
+        </button>
+      </form>
+
+      <!-- Step 2: código -->
+      <form id="form-codigo" class="hidden">
+        <div class="form-group">
+          <label for="codigo">Código recebido no WhatsApp</label>
+          <input
+            type="text"
+            id="codigo"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="6"
+            pattern="\d{6}"
+            placeholder="000000"
+            required
+          />
+        </div>
+        <button type="submit" class="btn btn--primario btn--full" id="btn-validar">
+          Entrar
+        </button>
+        <button type="button" class="btn btn--secundario btn--full" id="btn-voltar" style="margin-top: 8px;">
+          Trocar telefone
+        </button>
+      </form>
+
+      <div id="mensagem" class="mensagem hidden"></div>
+
+    </div>
+  </div>
+</main>
+
+<script src="/static/painel/app.js"></script>
+<script>
+  // Se já tem sessão, vai direto pro painel
+  if (getSession()) {
+    location.href = '/painel/pro.html';
+  }
+
+  const formTelefone = document.getElementById('form-telefone');
+  const formCodigo = document.getElementById('form-codigo');
+  const inputTelefone = document.getElementById('telefone');
+  const inputCodigo = document.getElementById('codigo');
+  const btnEnviar = document.getElementById('btn-enviar');
+  const btnValidar = document.getElementById('btn-validar');
+  const btnVoltar = document.getElementById('btn-voltar');
+  const msg = document.getElementById('mensagem');
+
+  let telefoneAtual = '';
+
+  function mostrarMensagem(texto, tipo) {
+    msg.textContent = texto;
+    msg.className = 'mensagem mensagem--' + tipo;
+  }
+
+  function limparMensagem() {
+    msg.className = 'mensagem hidden';
+    msg.textContent = '';
+  }
+
+  formTelefone.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    limparMensagem();
+    const tel = inputTelefone.value.trim();
+    if (!tel) return;
+
+    btnEnviar.disabled = true;
+    btnEnviar.textContent = 'Enviando...';
+
+    try {
+      const res = await fetch('/api/auth/otp/solicitar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telefone: tel }),
+      });
+
+      if (res.status === 429) {
+        mostrarMensagem('Muitas tentativas. Aguarde 10 minutos.', 'erro');
+        return;
+      }
+      if (!res.ok) {
+        let detail = 'Falha ao enviar. Tente novamente.';
+        try { detail = (await res.json()).detail || detail; } catch {}
+        mostrarMensagem(detail, 'erro');
+        return;
+      }
+
+      telefoneAtual = tel;
+      formTelefone.classList.add('hidden');
+      formCodigo.classList.remove('hidden');
+      mostrarMensagem('Código enviado pro seu WhatsApp. Confira lá!', 'ok');
+      setTimeout(() => inputCodigo.focus(), 100);
+    } catch (err) {
+      mostrarMensagem('Erro de conexão. Verifique sua internet.', 'erro');
+    } finally {
+      btnEnviar.disabled = false;
+      btnEnviar.textContent = 'Receber código';
+    }
+  });
+
+  formCodigo.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    limparMensagem();
+    const cod = inputCodigo.value.trim();
+    if (!/^\d{6}$/.test(cod)) {
+      mostrarMensagem('Código deve ter 6 dígitos.', 'erro');
+      return;
+    }
+
+    btnValidar.disabled = true;
+    btnValidar.textContent = 'Entrando...';
+
+    try {
+      const res = await fetch('/api/auth/otp/validar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ telefone: telefoneAtual, codigo: cod }),
+      });
+
+      if (res.status === 401) {
+        mostrarMensagem('Código inválido ou expirado.', 'erro');
+        return;
+      }
+      if (!res.ok) {
+        mostrarMensagem('Falha ao validar. Tente novamente.', 'erro');
+        return;
+      }
+
+      const data = await res.json();
+      setSession({
+        token: data.token,
+        usuario_id: data.usuario_id,
+        tipo: data.tipo,
+        master_id: data.master_id,
+      });
+      location.href = '/painel/pro.html';
+    } catch (err) {
+      mostrarMensagem('Erro de conexão. Verifique sua internet.', 'erro');
+    } finally {
+      btnValidar.disabled = false;
+      btnValidar.textContent = 'Entrar';
+    }
+  });
+
+  btnVoltar.addEventListener('click', () => {
+    formCodigo.classList.add('hidden');
+    formTelefone.classList.remove('hidden');
+    inputCodigo.value = '';
+    limparMensagem();
+    inputTelefone.focus();
+  });
+</script>
+
+</body>
+</html>
