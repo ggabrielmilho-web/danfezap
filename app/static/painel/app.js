@@ -100,3 +100,31 @@ function mascararChave(chave) {
   if (!chave || chave.length < 8) return chave || '';
   return '…' + chave.slice(-8);
 }
+
+/**
+ * Extrai dados estruturados de uma chave NFe de 44 dígitos.
+ *
+ * Layout oficial (Manual NFe):
+ *   pos 0-1   UF (2)
+ *   pos 2-5   AAMM emissão (4)
+ *   pos 6-19  CNPJ emitente (14)
+ *   pos 20-21 Modelo (2)
+ *   pos 22-24 Série (3)
+ *   pos 25-33 Número da NF (9)
+ *   pos 34    Tipo emissão (1)
+ *   pos 35-42 Código numérico (8)
+ *   pos 43    DV (1)
+ *
+ * Retorna null se a chave não tem 44 dígitos.
+ */
+function dadosChaveNFe(chave) {
+  if (!chave || !/^\d{44}$/.test(chave)) return null;
+  return {
+    uf: chave.substring(0, 2),
+    aamm: chave.substring(2, 6),
+    cnpj: chave.substring(6, 20),
+    modelo: chave.substring(20, 22),
+    serie: parseInt(chave.substring(22, 25), 10),
+    numero: parseInt(chave.substring(25, 34), 10),
+  };
+}

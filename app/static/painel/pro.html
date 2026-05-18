@@ -206,7 +206,13 @@
     }
     const rows = items.map(c => {
       const data = formatarData(c.data_consulta);
-      const chaveM = mascararChave(c.chave_nfe);
+      const dados = dadosChaveNFe(c.chave_nfe);
+      const notaCel = dados
+        ? `<div class="nota-info">
+             <strong>Nº ${dados.numero.toLocaleString('pt-BR')}</strong>
+             <span class="nota-info__serie">série ${dados.serie}</span>
+           </div>`
+        : `<code>${escapeHtml(mascararChave(c.chave_nfe))}</code>`;
       const status = c.sucesso
         ? '<span class="badge badge--ok">Sucesso</span>'
         : '<span class="badge badge--erro">Erro</span>';
@@ -218,7 +224,7 @@
         : `<span style="color: var(--cor-texto-suave); font-size: 12px;">—</span>`;
       return `<tr>
         <td>${data}</td>
-        <td title="${escapeHtml(c.chave_nfe || '')}"><code>${escapeHtml(chaveM)}</code></td>
+        <td title="${escapeHtml(c.chave_nfe || '')}">${notaCel}</td>
         <td>${status}</td>
         <td>${acoes}</td>
       </tr>`;
@@ -230,7 +236,7 @@
           <thead>
             <tr>
               <th>Data</th>
-              <th>Chave</th>
+              <th>Nota fiscal</th>
               <th>Status</th>
               <th>Ações</th>
             </tr>

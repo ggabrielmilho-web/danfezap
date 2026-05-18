@@ -246,6 +246,23 @@ tbody tr:hover { background: var(--cor-fundo-suave); }
 
 .acoes-cel { display: flex; gap: 6px; }
 
+.nota-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.2;
+}
+.nota-info strong {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--cor-texto);
+}
+.nota-info__serie {
+  font-size: 11px;
+  color: var(--cor-texto-suave);
+  text-transform: lowercase;
+}
+
 .empty {
   text-align: center;
   padding: 48px 24px;
